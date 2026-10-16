@@ -19,10 +19,13 @@ proxmox-kernel-7.2-edge (7.2.11-1) trixie; urgency=medium
 
   * build from the Proxmox VE 7.0 kernel config, updated with olddefconfig.
 
+  * build perf without libdebuginfod and libLLVM, so it does not link
+    against libcrypto through libcurl.
+
   * add CONFIG_X86_MARCH_ICELAKE_SERVER and build for Sunny Cove
     (-march=icelake-server) by default; selectable via EDGE_MARCH.
 
- -- pve-edge-kernel <root@localhost>  Fri, 16 Oct 2026 15:30:00 +0530
+ -- pve-edge-kernel <pve-edge-kernel@users.noreply.github.com>  Fri, 16 Oct 2026 15:30:00 +0530
 
 proxmox-kernel-7.0 (7.0.14-24) trixie; urgency=medium
 
