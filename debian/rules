@@ -17,7 +17,7 @@ CHANGELOG_DATE:=$(shell dpkg-parsechangelog -SDate)
 CHANGELOG_DATE_UTC_ISO := $(shell date -u -d '$(CHANGELOG_DATE)' +%Y-%m-%dT%H:%MZ)
 
 PMX_KERNEL_PKG=proxmox-kernel-$(KVNAME)
-PMX_KERNEL_SERIES_PKG=proxmox-kernel-$(KERNEL_MAJMIN)
+PMX_KERNEL_SERIES_PKG=proxmox-kernel-$(KERNEL_SERIES)
 PMX_DEBUG_KERNEL_PKG=proxmox-kernel-$(KVNAME)-dbgsym
 PMX_HEADER_PKG=proxmox-headers-$(KVNAME)
 PMX_USR_HEADER_PKG=proxmox-kernel-libc-dev
@@ -29,6 +29,12 @@ KERNEL_SRC_COPY=$(KERNEL_SRC)_tmp
 PMX_CONFIG_OPTS = \
 $(shell cat debian/rules.d/config-common.opts) \
 $(shell cat debian/rules.d/config-$(DEB_BUILD_ARCH).opts 2>/dev/null)
+
+ifeq ($(EDGE_NATIVE_CPU)-$(DEB_BUILD_ARCH),1-amd64)
+PMX_CONFIG_OPTS += -e CONFIG_X86_NATIVE_CPU
+else
+PMX_CONFIG_OPTS += -d CONFIG_X86_NATIVE_CPU
+endif
 
 
 debian/control: $(wildcard debian/*.in)
@@ -44,7 +50,7 @@ debian/control: $(wildcard debian/*.in)
 	chmod +x debian/$(PMX_KERNEL_SERIES_PKG).postrm
 	chmod +x debian/$(PMX_KERNEL_SERIES_PKG).postinst
 	chmod +x debian/$(PMX_HEADER_PKG).postinst
-	sed -e 's/@KVNAME@/$(KVNAME)/g' -e 's/@KVMAJMIN@/$(KERNEL_MAJMIN)/g' -e 's/@ARCH@/$(DEB_BUILD_ARCH)/g' -e 's/@GRUB_RECOMMENDS@/$(GRUB_RECOMMENDS)/g' < debian/control.in > debian/control
+	sed -e 's/@KVNAME@/$(KVNAME)/g' -e 's/@KVSERIES@/$(KERNEL_SERIES)/g' -e 's/@KVMAJMIN@/$(KERNEL_MAJMIN)/g' -e 's/@ARCH@/$(DEB_BUILD_ARCH)/g' -e 's/@GRUB_RECOMMENDS@/$(GRUB_RECOMMENDS)/g' < debian/control.in > debian/control
 
 	# signing-template
 	sed -e '1 s/proxmox-kernel/proxmox-kernel-signed/' -e '1 s/${DEB_VERSION}/${PMX_KERNEL_SIGNED_VERSION}/' < debian/changelog > debian/signing-template/changelog
@@ -120,9 +126,9 @@ endif
 	find debian/$(PMX_KERNEL_PKG)/usr/lib/modules -name \*.ko -print | while read f ; do strip --strip-debug "$$f"; done
 
 	# sign modules using ephemeral, embedded key
-	if grep -q CONFIG_MODULE_SIG=y ubuntu-kernel/.config ; then \
+	if grep -q CONFIG_MODULE_SIG=y $(KERNEL_SRC)/.config ; then \
 		find debian/$(PMX_KERNEL_PKG)/usr/lib/modules -name \*.ko -print | while read f ; do \
-			./ubuntu-kernel/scripts/sign-file sha512 ./ubuntu-kernel/certs/signing_key.pem ubuntu-kernel/certs/signing_key.x509 "$$f" ; \
+			./$(KERNEL_SRC)/scripts/sign-file sha512 ./$(KERNEL_SRC)/certs/signing_key.pem $(KERNEL_SRC)/certs/signing_key.x509 "$$f" ; \
 		done; \
 	fi
 	# finalize
@@ -153,8 +159,8 @@ endif
 	cp debian/signing-template/files.json debian/${PMX_KERNEL_SIGNING_TEMPLATE_PKG}/usr/share/code-signing/${PMX_KERNEL_SIGNING_TEMPLATE_PKG}/
 
 	# only clean-up signing key now to allow continuing build if anything from above fails
-	if grep -q CONFIG_MODULE_SIG=y ubuntu-kernel/.config ; then \
-		rm ./ubuntu-kernel/certs/signing_key.pem ; \
+	if grep -q CONFIG_MODULE_SIG=y $(KERNEL_SRC)/.config ; then \
+		rm ./$(KERNEL_SRC)/certs/signing_key.pem ; \
 	fi
 
 	touch $@

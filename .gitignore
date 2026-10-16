@@ -6,3 +6,5 @@
 /abi-tmp*
 /config*.org
 /proxmox-kernel-[0-9]*/
+/upstream/*.tar.xz
+/upstream/*.tmp

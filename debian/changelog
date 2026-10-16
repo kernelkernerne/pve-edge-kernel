@@ -1,3 +1,18 @@
+proxmox-kernel-7.2-edge (7.2.11-1) trixie; urgency=medium
+
+  * rebase onto vanilla Linux 7.2.11 from kernel.org instead of the Ubuntu
+    kernel tree.
+
+  * drop patches that are already part of 7.2.11 and reverts of Ubuntu SAUCE
+    patches that do not exist in the vanilla tree; refresh the remaining
+    patches against 7.2.11.
+
+  * build from the Proxmox VE 7.0 kernel config, updated with olddefconfig.
+
+  * optionally optimize for the build host CPU (CONFIG_X86_NATIVE_CPU).
+
+ -- pve-edge-kernel <root@localhost>  Fri, 16 Oct 2026 15:30:00 +0530
+
 proxmox-kernel-7.0 (7.0.14-24) trixie; urgency=medium
 
   * fix #7969: PCI: revert a change that made the kernel lift the 2.5GT/s

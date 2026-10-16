@@ -2,21 +2,27 @@ include /usr/share/dpkg/pkg-info.mk
 
 # also bump proxmox-kernel-meta if the default MAJ.MIN version changes!
 KERNEL_MAJ=7
-KERNEL_MIN=0
-KERNEL_PATCHLEVEL=14
+KERNEL_MIN=2
+KERNEL_PATCHLEVEL=11
 # increment KREL for every published package release!
 # rebuild packages with new KREL and run 'make abiupdate'
-KREL=24
+KREL=1
 
 # Use to create a separate package for the same version, like -bpoXY for backport or test-$foo.
 # This way the package can be co-installed with the original, a requirement for major dist updates.
-KREL_EXTRA=
+KREL_EXTRA=-edge
+
+# Optimize for the CPU of the build host (CONFIG_X86_NATIVE_CPU, i.e. -march=native).
+# Set to 0 for a generic x86-64 build that runs on any machine.
+EDGE_NATIVE_CPU ?= 1
 # Normally empty, but allows adding a part just for the debian package revision, like ~bpoXY+Z.
 # For the kernel pkg itself it wouldn't matter, but for the meta pkgs it allows major dist upgrades.
 PKG_REV_EXTRA=
 
 KERNEL_MAJMIN=$(KERNEL_MAJ).$(KERNEL_MIN)
 KERNEL_VER=$(KERNEL_MAJMIN).$(KERNEL_PATCHLEVEL)
+# name of the series meta-packages, kept distinct from the official proxmox-kernel-X.Y
+KERNEL_SERIES=$(KERNEL_MAJMIN)-edge
 
 DEB_VERSION=$(KERNEL_VER)-$(KREL)$(PKG_REV_EXTRA)
 EXTRAVERSION=-$(KREL)$(KREL_EXTRA)-pve
@@ -40,9 +46,12 @@ SKIPABI=0
 
 BUILD_DIR=proxmox-kernel-$(KERNEL_VER)
 
-KERNEL_SRC=ubuntu-kernel
-KERNEL_SRC_SUBMODULE=submodules/$(KERNEL_SRC)
-KERNEL_CFG_ORG=config-$(KERNEL_VER)-$(ARCH).org
+KERNEL_SRC=linux
+KERNEL_TARBALL=linux-$(KERNEL_VER).tar.xz
+KERNEL_TARBALL_URL=https://cdn.kernel.org/pub/linux/kernel/v$(KERNEL_MAJ).x/$(KERNEL_TARBALL)
+KERNEL_TARBALL_SHA256=upstream/$(KERNEL_TARBALL).sha256
+# base config, taken from the Proxmox VE 7.0 kernel; updated with olddefconfig during the build
+KERNEL_CFG_BASE=config/config-base-$(ARCH)
 
 ZFSONLINUX_SUBMODULE=submodules/zfsonlinux
 ZFSDIR=pkg-zfs
@@ -51,14 +60,14 @@ MODULES=modules
 MODULE_DIRS=$(ZFSDIR)
 
 # exported to debian/rules via debian/rules.d/dirs.mk
-DIRS=KERNEL_SRC ZFSDIR MODULES
+DIRS=KERNEL_SRC ZFSDIR MODULES EDGE_NATIVE_CPU
 
-DSC=proxmox-kernel-$(KERNEL_MAJMIN)_$(DEB_VERSION).dsc
+DSC=proxmox-kernel-$(KERNEL_SERIES)_$(DEB_VERSION).dsc
 DST_DEB=$(PACKAGE)_$(DEB_VERSION)_$(ARCH).deb
 SIGNED_TEMPLATE_DEB=$(PACKAGE)-signed-template_$(DEB_VERSION)_$(ARCH).deb
-META_DEB=proxmox-kernel-$(KERNEL_MAJMIN)_$(DEB_VERSION)_$(ARCH).deb
+META_DEB=proxmox-kernel-$(KERNEL_SERIES)_$(DEB_VERSION)_$(ARCH).deb
 HDR_DEB=$(HDRPACKAGE)_$(DEB_VERSION)_$(ARCH).deb
-META_HDR_DEB=proxmox-headers-$(KERNEL_MAJMIN)_$(DEB_VERSION)_$(ARCH).deb
+META_HDR_DEB=proxmox-headers-$(KERNEL_SERIES)_$(DEB_VERSION)_$(ARCH).deb
 USR_HDR_DEB=proxmox-kernel-libc-dev_$(DEB_VERSION)_$(ARCH).deb
 LINUX_TOOLS_DEB=linux-tools-$(KERNEL_MAJMIN)_$(DEB_VERSION)_$(ARCH).deb
 LINUX_TOOLS_DBG_DEB=linux-tools-$(KERNEL_MAJMIN)-dbgsym_$(DEB_VERSION)_$(ARCH).deb
@@ -105,18 +114,26 @@ debian.prepared: debian
 	@$(foreach dir, $(DIRS),echo "$(dir)=$($(dir))" >> $(BUILD_DIR)/debian/rules.d/env.mk;)
 	echo "KVNAME=$(KVNAME)" >> $(BUILD_DIR)/debian/rules.d/env.mk
 	echo "KERNEL_MAJMIN=$(KERNEL_MAJMIN)" >> $(BUILD_DIR)/debian/rules.d/env.mk
+	echo "KERNEL_SERIES=$(KERNEL_SERIES)" >> $(BUILD_DIR)/debian/rules.d/env.mk
 	cd $(BUILD_DIR); debian/rules debian/control
 	touch $@
 
-$(KERNEL_SRC).prepared: $(KERNEL_SRC_SUBMODULE) | submodule
+upstream/$(KERNEL_TARBALL):
+	mkdir -p upstream
+	curl -fL --retry 3 -o $@.tmp $(KERNEL_TARBALL_URL)
+	mv $@.tmp $@
+
+.PHONY: download
+download: upstream/$(KERNEL_TARBALL)
+	cd upstream; sha256sum -c $(KERNEL_TARBALL).sha256
+
+$(KERNEL_SRC).prepared: upstream/$(KERNEL_TARBALL) $(KERNEL_CFG_BASE)
+	cd upstream; sha256sum -c $(KERNEL_TARBALL).sha256
 	rm -rf $(BUILD_DIR)/$(KERNEL_SRC) $@
-	mkdir -p $(BUILD_DIR)
-	cp -a $(KERNEL_SRC_SUBMODULE) $(BUILD_DIR)/$(KERNEL_SRC)
-	cd $(BUILD_DIR)/$(KERNEL_SRC); git clean -xdfi
-	cd $(BUILD_DIR)/$(KERNEL_SRC); python3 debian/scripts/misc/annotations --arch $(ARCH) --export >../../$(KERNEL_CFG_ORG)
-	cp $(KERNEL_CFG_ORG) $(BUILD_DIR)/$(KERNEL_SRC)/.config
+	mkdir -p $(BUILD_DIR)/$(KERNEL_SRC)
+	tar -C $(BUILD_DIR)/$(KERNEL_SRC) --strip-components=1 -xf upstream/$(KERNEL_TARBALL)
+	cp $(KERNEL_CFG_BASE) $(BUILD_DIR)/$(KERNEL_SRC)/.config
 	sed -i $(BUILD_DIR)/$(KERNEL_SRC)/Makefile -e 's/^EXTRAVERSION.*$$/EXTRAVERSION=$(EXTRAVERSION)/'
-	rm -rf $(BUILD_DIR)/$(KERNEL_SRC)/debian $(BUILD_DIR)/$(KERNEL_SRC)/debian.master
 	set -e; cd $(BUILD_DIR)/$(KERNEL_SRC); \
 	  for patch in ../../patches/kernel/*.patch; do \
 	    echo "applying patch '$$patch'"; \
@@ -127,18 +144,13 @@ $(KERNEL_SRC).prepared: $(KERNEL_SRC_SUBMODULE) | submodule
 $(MODULES).prepared: $(addsuffix .prepared,$(MODULE_DIRS))
 	touch $@
 
-$(ZFSDIR).prepared: $(ZFSONLINUX_SUBMODULE)
+$(ZFSDIR).prepared: $(ZFSONLINUX_SUBMODULE) | submodule
 	rm -rf $(BUILD_DIR)/$(MODULES)/$(ZFSDIR) $(BUILD_DIR)/$(MODULES)/tmp $@
 	mkdir -p $(BUILD_DIR)/$(MODULES)/tmp
 	cp -a $(ZFSONLINUX_SUBMODULE)/* $(BUILD_DIR)/$(MODULES)/tmp
 	cd $(BUILD_DIR)/$(MODULES)/tmp; make kernel
 	rm -rf $(BUILD_DIR)/$(MODULES)/tmp
 	touch $(ZFSDIR).prepared
-
-.PHONY: upload
-upload: UPLOAD_DIST ?= $(DEB_DISTRIBUTION)
-upload: $(DEBS)
-	tar cf - $(DEBS)|ssh -X repoman@repo.proxmox.com -- upload --product pve,pmg,pbs,pdm --dist $(UPLOAD_DIST) --arch $(ARCH)
 
 .PHONY: distclean
 distclean: clean
@@ -147,13 +159,11 @@ distclean: clean
 # upgrade to current master
 .PHONY: update_modules
 update_modules: submodule
-	git submodule foreach 'git pull --ff-only origin master'
 	cd $(ZFSONLINUX_SUBMODULE); git pull --ff-only origin master
 
 # make sure submodules were initialized
 .PHONY: submodule
 submodule:
-	test -f "$(KERNEL_SRC_SUBMODULE)/README" || git submodule update --init $(KERNEL_SRC_SUBMODULE)
 	test -f "$(ZFSONLINUX_SUBMODULE)/Makefile" || git submodule update --init --recursive $(ZFSONLINUX_SUBMODULE)
 
 # call after ABI bump with header deb in working directory
@@ -177,5 +187,5 @@ abi-tmp-$(KVNAME)-$(ARCH):
 
 .PHONY: clean
 clean:
-	rm -rf *~ proxmox-kernel-[0-9]*/ *.prepared $(KERNEL_CFG_ORG)
+	rm -rf *~ proxmox-kernel-[0-9]*/ *.prepared
 	rm -f *.deb *.dsc *.changes *.buildinfo *.build proxmox-kernel*.tar.*
