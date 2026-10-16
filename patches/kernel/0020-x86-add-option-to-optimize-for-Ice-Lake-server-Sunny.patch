@@ -1,0 +1,52 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: pve-edge-kernel <root@localhost>
+Date: Fri, 16 Oct 2026 15:40:00 +0530
+Subject: [PATCH] x86: add option to optimize for Ice Lake server (Sunny Cove)
+
+Add CONFIG_X86_MARCH_ICELAKE_SERVER, which builds the kernel with
+-march=icelake-server and the Rust equivalent target-cpu, as an explicit
+and host-independent alternative to CONFIG_X86_NATIVE_CPU.
+---
+ arch/x86/Kconfig.cpu | 14 ++++++++++++++
+ arch/x86/Makefile    |  3 +++
+ 2 files changed, 17 insertions(+)
+
+diff --git a/arch/x86/Kconfig.cpu b/arch/x86/Kconfig.cpu
+index 6e7a366f079841dcf9ca3ba3c6957d449fd90217..5e4c19649525bb3a7b520bdea3a71f1b91fa2198 100644
+--- a/arch/x86/Kconfig.cpu
++++ b/arch/x86/Kconfig.cpu
+@@ -229,6 +229,20 @@ config X86_NATIVE_CPU
+ 
+ 	  If unsure, say N.
+ 
++config X86_MARCH_ICELAKE_SERVER
++	bool "Build and optimize for Intel Ice Lake server (Sunny Cove)"
++	depends on X86_64
++	depends on !X86_NATIVE_CPU
++	depends on $(cc-option,-march=icelake-server)
++	help
++	  Build the kernel with -march=icelake-server, targeting 3rd gen
++	  Xeon Scalable (Ice Lake-SP) and other Sunny Cove based CPUs.
++
++	  The resulting kernel will not boot on CPUs lacking the
++	  instruction set extensions of Sunny Cove.
++
++	  If unsure, say N.
++
+ config X86_GENERIC
+ 	bool "Generic x86 support"
+ 	depends on X86_32
+diff --git a/arch/x86/Makefile b/arch/x86/Makefile
+index 8af6b80cffdd8b00185136650cf522e15f5a0c49..dc3571f618139bc39bef3d7870cac94a9277eb11 100644
+--- a/arch/x86/Makefile
++++ b/arch/x86/Makefile
+@@ -167,6 +167,9 @@ ifdef CONFIG_X86_NATIVE_CPU
+ 
+         # generate_rust_target.rs handles Rust APX gating.
+         KBUILD_RUSTFLAGS += -Ctarget-cpu=native
++else ifdef CONFIG_X86_MARCH_ICELAKE_SERVER
++        KBUILD_CFLAGS += -march=icelake-server -mtune=icelake-server
++        KBUILD_RUSTFLAGS += -Ctarget-cpu=icelake-server
+ else
+         KBUILD_CFLAGS += -march=x86-64 -mtune=generic
+         KBUILD_RUSTFLAGS += -Ctarget-cpu=x86-64 -Ztune-cpu=generic

@@ -3,9 +3,19 @@ proxmox-kernel-7.2-edge (7.2.11-1) trixie; urgency=medium
   * rebase onto vanilla Linux 7.2.11 from kernel.org instead of the Ubuntu
     kernel tree.
 
-  * drop patches that are already part of 7.2.11 and reverts of Ubuntu SAUCE
-    patches that do not exist in the vanilla tree; refresh the remaining
-    patches against 7.2.11.
+  * patch queue rebased onto 7.2.11:
+    - drop 222 patches that are already part of 7.2.11, via mainline or the
+      7.2.y stable series.
+    - drop reverts of Ubuntu SAUCE patches, which do not exist in the
+      vanilla tree, and the re-applied Ubuntu r8169 RTL8116af quirk.
+    - drop the act_ct 'add_helper' dead code removal, which only served as
+      a prerequisite for a backport that 7.2 contains in a different form.
+    - refresh the PCIe ACS override and KVM halt polling patches.
+    - extend the PCIe 2.5GT/s link retraining revert (fix #7969) to also
+      revert the follow-up commits from 7.2.
+
+  * apply patches with --forward, so an already applied patch fails the
+    build instead of being silently reversed.
 
   * build from the Proxmox VE 7.0 kernel config, updated with olddefconfig.
 

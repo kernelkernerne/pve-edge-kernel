@@ -139,7 +139,7 @@ $(KERNEL_SRC).prepared: upstream/$(KERNEL_TARBALL) $(KERNEL_CFG_BASE)
 	set -e; cd $(BUILD_DIR)/$(KERNEL_SRC); \
 	  for patch in ../../patches/kernel/*.patch; do \
 	    echo "applying patch '$$patch'"; \
-	    patch --batch -p1 < "$${patch}"; \
+	    patch --batch --forward -p1 < "$${patch}"; \
 	  done
 	touch $@
 
