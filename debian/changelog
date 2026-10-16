@@ -1,4 +1,4 @@
-proxmox-kernel-7.2-edge (7.2.11-1) trixie; urgency=medium
+proxmox-kernel-edge-7.2 (7.2.11-1) trixie; urgency=medium
 
   * rebase onto vanilla Linux 7.2.11 from kernel.org instead of the Ubuntu
     kernel tree.
@@ -18,6 +18,10 @@ proxmox-kernel-7.2-edge (7.2.11-1) trixie; urgency=medium
     build instead of being silently reversed.
 
   * build from the Proxmox VE 7.0 kernel config, updated with olddefconfig.
+
+  * name the series meta-packages proxmox-kernel-edge-X.Y and
+    proxmox-headers-edge-X.Y, so proxmox-kernel-helper does not mistake
+    them for a bootable kernel version.
 
   * build perf without libdebuginfod and libLLVM, so it does not link
     against libcrypto through libcurl.
