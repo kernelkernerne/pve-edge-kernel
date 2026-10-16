@@ -12,9 +12,11 @@ KREL=1
 # This way the package can be co-installed with the original, a requirement for major dist updates.
 KREL_EXTRA=-edge
 
-# Optimize for the CPU of the build host (CONFIG_X86_NATIVE_CPU, i.e. -march=native).
-# Set to 0 for a generic x86-64 build that runs on any machine.
-EDGE_NATIVE_CPU ?= 1
+# x86-64 CPU optimization target (amd64 only):
+#   icelake-server - Sunny Cove / 3rd gen Xeon Scalable (CONFIG_X86_MARCH_ICELAKE_SERVER)
+#   native         - CPU of the build host (CONFIG_X86_NATIVE_CPU)
+#   generic        - baseline x86-64, runs on any machine
+EDGE_MARCH ?= icelake-server
 # Normally empty, but allows adding a part just for the debian package revision, like ~bpoXY+Z.
 # For the kernel pkg itself it wouldn't matter, but for the meta pkgs it allows major dist upgrades.
 PKG_REV_EXTRA=
@@ -60,7 +62,7 @@ MODULES=modules
 MODULE_DIRS=$(ZFSDIR)
 
 # exported to debian/rules via debian/rules.d/dirs.mk
-DIRS=KERNEL_SRC ZFSDIR MODULES EDGE_NATIVE_CPU
+DIRS=KERNEL_SRC ZFSDIR MODULES EDGE_MARCH
 
 DSC=proxmox-kernel-$(KERNEL_SERIES)_$(DEB_VERSION).dsc
 DST_DEB=$(PACKAGE)_$(DEB_VERSION)_$(ARCH).deb

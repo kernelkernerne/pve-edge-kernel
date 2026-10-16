@@ -30,10 +30,16 @@ PMX_CONFIG_OPTS = \
 $(shell cat debian/rules.d/config-common.opts) \
 $(shell cat debian/rules.d/config-$(DEB_BUILD_ARCH).opts 2>/dev/null)
 
-ifeq ($(EDGE_NATIVE_CPU)-$(DEB_BUILD_ARCH),1-amd64)
-PMX_CONFIG_OPTS += -e CONFIG_X86_NATIVE_CPU
+ifeq ($(DEB_BUILD_ARCH),amd64)
+ifeq ($(EDGE_MARCH),icelake-server)
+PMX_CONFIG_OPTS += -d CONFIG_X86_NATIVE_CPU -e CONFIG_X86_MARCH_ICELAKE_SERVER
+else ifeq ($(EDGE_MARCH),native)
+PMX_CONFIG_OPTS += -e CONFIG_X86_NATIVE_CPU -d CONFIG_X86_MARCH_ICELAKE_SERVER
+else ifeq ($(EDGE_MARCH),generic)
+PMX_CONFIG_OPTS += -d CONFIG_X86_NATIVE_CPU -d CONFIG_X86_MARCH_ICELAKE_SERVER
 else
-PMX_CONFIG_OPTS += -d CONFIG_X86_NATIVE_CPU
+$(error unknown EDGE_MARCH '$(EDGE_MARCH)', use icelake-server, native or generic)
+endif
 endif
 
 
