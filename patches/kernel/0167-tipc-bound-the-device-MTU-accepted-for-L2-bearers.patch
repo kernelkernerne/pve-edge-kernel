@@ -1,0 +1,115 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Yunpeng Tian <shionthanatos@gmail.com>
+Date: Fri, 2 Oct 2026 20:50:18 -0700
+Subject: [PATCH] tipc: bound the device MTU accepted for L2 bearers
+
+struct tipc_bearer keeps the bearer MTU in a u32 while struct tipc_link
+keeps the link MTU in a u16.  tipc_enable_l2_media() and the
+NETDEV_CHANGEMTU notifier both do b->mtu = dev->mtu, tipc_link_create()
+assigns that into l->mtu, and tipc_link_set_queue_limits() divides by it:
+
+	int max_bulk = TIPC_MAX_PUBL / (l->mtu / ITEM_SIZE);
+
+ITEM_SIZE is 20, so a device MTU of 65536 truncates to 0 and the
+division faults.
+
+tipc_mtu_bad() is the only check on either assignment and tests a lower
+bound only.  The truncation defeats even that: a device MTU of 65556
+passes it, yet the link comes out with l->mtu = 20, below the
+TIPC_MIN_BEARER_MTU the check exists to enforce, and tipc_link_mss()
+then evaluates 20 - INT_H_SIZE - EMSG_OVERHEAD as an int and stores it
+in the u32 tipc_link_entry::mtu.  Read back over TIPC_NL_LINK_GET, every
+device MTU above 65535 leaves the link with a wrong MTU: 20 at 65556,
+464 at 66000, 32768 at 98304.
+
+The bound added in commit 9f29cd8a8e79 ("tipc: fix u16 MTU truncation in
+media and bearer MTU validation") applies to TIPC_NLA_PROP_MTU in
+tipc_nl_prop_policy, which covers TIPC_NL_MEDIA_SET and
+TIPC_NL_BEARER_SET.  A device MTU never passes through that policy.
+
+dummy sets max_mtu to 0, and dev_validate_mtu() applies its ceiling only
+when max_mtu is non-zero, so the device accepts 65536; a macvlan inherits
+max_mtu from its lower device,
+and two macvlans in bridge mode on one dummy carry each other's TIPC
+discovery frames, so the bearer reaches tipc_node_check_dest() and
+tipc_link_create() with b->mtu = 65536.  TIPC_NL_BEARER_ENABLE is
+GENL_UNS_ADMIN_PERM, so an unprivileged user can do this in a user
+namespace of their own, on a kernel that has TIPC loaded.
+
+  Oops: divide error: 0000 [#1] SMP KASAN NOPTI
+  RIP: 0010:tipc_link_create (net/tipc/link.c:2531 net/tipc/link.c:520)
+  Call Trace:
+   <IRQ>
+   tipc_node_check_dest (net/tipc/node.c:1284)
+   tipc_disc_rcv (net/tipc/discover.c:252)
+   tipc_rcv (net/tipc/node.c:2134)
+   tipc_l2_rcv_msg (net/tipc/bearer.c:669)
+   __netif_receive_skb_one_core (net/core/dev.c:6216)
+   process_backlog (net/core/dev.c:6680)
+   __napi_poll (net/core/dev.c:7739)
+   net_rx_action (net/core/dev.c:7802)
+   handle_softirqs (kernel/softirq.c:622)
+   </IRQ>
+  Kernel panic - not syncing: Fatal exception in interrupt
+
+Give tipc_mtu_bad() the matching upper bound, so the limit sits next to
+the existing minimum and one check covers both assignments.  A device
+MTU of 65535 is still accepted and the link still comes up, with the
+65532 that TIPC rounds it to.
+
+The u32 max_pkt fields became u16 mtu and advertised_mtu in commit
+ed193ece2649 ("tipc: simplify link mtu negotiation"), which also removed
+link_init_max_pkt(); that had clamped the bearer MTU to MAX_MSG_SIZE
+before it could reach this division.
+
+Cc: stable+noautosel@kernel.org # local DoS by userns are a dime a dozen
+Fixes: ed193ece2649 ("tipc: simplify link mtu negotiation")
+Reported-by: Gongming Wang <gmwgg05@gmail.com>
+Reported-by: Mingda Zhang <npczmd@qq.com>
+Reported-by: Xiaoyu Zhou <xiao-yu.zhou@connect.polyu.hk>
+Reported-by: Qinrun Dai <jupmouse@gmail.com>
+Signed-off-by: Yunpeng Tian <shionthanatos@gmail.com>
+Reviewed-by: Tung Nguyen <tung.quang.nguyen@est.tech>
+Link: https://patch.msgid.link/20261003035018.397-1-shionthanatos@gmail.com
+Signed-off-by: Jakub Kicinski <kuba@kernel.org>
+(cherry picked from commit 592d0fdb02dfd5f53ef50cc364aa989819792f73)
+Signed-off-by: Thomas Lamprecht <t.lamprecht@proxmox.com>
+---
+ net/tipc/bearer.h | 14 +++++++++++---
+ 1 file changed, 11 insertions(+), 3 deletions(-)
+
+diff --git a/net/tipc/bearer.h b/net/tipc/bearer.h
+index 41eac1ee0c09124e454ba281bff5b476f72e8ab1..9b287fc81f4dfdcd3f40b73f649928cb16a2879a 100644
+--- a/net/tipc/bearer.h
++++ b/net/tipc/bearer.h
+@@ -63,6 +63,13 @@
+ /* Minimum bearer MTU */
+ #define TIPC_MIN_BEARER_MTU	(MAX_H_SIZE + INT_H_SIZE)
+ 
++/* Maximum bearer MTU
++ *
++ * struct tipc_link stores the link MTU in a u16, so a larger bearer MTU would
++ * be truncated when a link is created on the bearer.
++ */
++#define TIPC_MAX_BEARER_MTU	U16_MAX
++
+ /* Identifiers for distinguishing between broadcast/multicast and replicast
+  */
+ #define TIPC_BROADCAST_SUPPORT  1
+@@ -254,12 +261,13 @@ static inline void tipc_loopback_trace(struct net *net,
+ 		tipc_clone_to_loopback(net, pkts);
+ }
+ 
+-/* check if device MTU is too low for tipc headers */
++/* check if device MTU is usable for tipc bearers */
+ static inline bool tipc_mtu_bad(struct net_device *dev)
+ {
+-	if (dev->mtu >= TIPC_MIN_BEARER_MTU)
++	if (dev->mtu >= TIPC_MIN_BEARER_MTU &&
++	    dev->mtu <= TIPC_MAX_BEARER_MTU)
+ 		return false;
+-	netdev_warn(dev, "MTU too low for tipc bearer\n");
++	netdev_warn(dev, "MTU not usable for tipc bearer\n");
+ 	return true;
+ }
+ 
