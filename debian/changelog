@@ -1,3 +1,84 @@
+proxmox-kernel-7.0 (7.0.14-29) trixie; urgency=medium
+
+  * fix #8121: NFS server: fix server-side copies of larger files by NFS 4.2
+    clients, for example with cp, hanging since 7.0.14-20. Clients with a
+    kernel older than 6.15 waited forever, newer ones at least three seconds
+    per copy. The copied data was not affected.
+
+  * btrfs: stop logging false "unable to release extent buffer" warnings on
+    every unmount since 7.0.14-25, and avoid a false IO error from fsync
+    after a direct write that fell back to buffered IO.
+
+  * KSM: fix possible data loss in merged memory, for example of VMs, under
+    memory pressure, after a process used MADV_FREE on one of the merged
+    pages.
+
+  * CIFS: fix data corruption when a file gets truncated on open while it is
+    being written, and the file appearing empty to the client after such an
+    open failed.
+
+  * amdgpu: keep Navi 1x and 2x GPUs usable after switching them from amdgpu
+    to vfio-pci for passthrough. With runtime power management and the audio
+    function enabled, they could become unreachable after the next reset.
+
+  * netfilter: nftables rules that rewrite packet headers or payload, and
+    NFQUEUE verdicts with modified packets, now fail with "Operation not
+    permitted" in unprivileged containers, as such rewrites could corrupt
+    header fields that the network stack had already validated. Newer
+    upstream kernels behave the same.
+
+  * tun: require CAP_NET_ADMIN to attach to a TUN/TAP device that has
+    neither an owner nor a group set, as any local user could read and
+    inject its traffic otherwise. Unprivileged processes using such a
+    device, for example VPN daemons that drop their privileges, need an
+    owner or group set on it. VMs are not affected.
+
+  * fix use-after-free bugs that local users, including root in unprivileged
+    containers, could trigger in the PAGEMAP_SCAN ioctl, coredumps, page
+    faults, file delegations, IPv6 route dumps, IP fragment reassembly, the
+    QFQ packet scheduler, IPv6 multicast routing, MPTCP and the teardown of
+    network namespaces.
+
+  * net: fix bugs that local users, root in unprivileged containers or
+    remote peers could trigger:
+    - SCTP: two crashes, which a remote peer or a local user could trigger.
+    - CAN: a crash through ISO-TP sockets, which local users could trigger.
+    - TCP: a crash in socket lookups under load with SYN cookies, and a
+      use-after-free in request migration with the tcp_migrate_req sysctl
+      enabled.
+    - IPsec: reassembled packets were accepted when only some of their
+      fragments were authenticated.
+    - TIPC: a device reference leak that root in a container could use to
+      block network configuration on the host, and a heap overflow and a
+      crash with unusual MTUs. Bearers on devices with an MTU too small for
+      the TIPC headers or above 65535 are now refused.
+    - netlink: information about kernel addresses leaked to local users.
+
+  * fix hangs that local users could cause: system calls looping in the
+    kernel on MAP_DROPPABLE memory in a full memory cgroup or on overflowing
+    io_uring completions, and closed io_uring SQPOLL rings of a stopped
+    process blocking the cleanup of all others.
+
+  * bpf: require the file descriptor of a cgroup BPF program or a capability
+    on the host to detach it. So far, local users could detach programs that
+    were attached without support for multiple programs.
+
+  * mm: fix page table walks of the multi-gen LRU using stale page table
+    entries, and a race of truncate with the unmapping of transparent huge
+    pages. Charge NUMA memory policies of shared memory to the memory
+    cgroup, so containers cannot use them to exceed their memory limit.
+
+  * KVM: limit the shadow page lists that a guest can build up, which let
+    guests with nested virtualization keep a host CPU busy for a long time.
+
+  * crypto: fix a use-after-free in the ESSIV template with asynchronous
+    AEAD implementations.
+
+  * NFS: fix operations on a directory failing with ENOENT after an attempt
+    to create it failed, for example because it already existed.
+
+ -- Proxmox Support Team <support@proxmox.com>  Fri, 06 Nov 2026 17:55:43 +0100
+
 proxmox-kernel-7.0 (7.0.14-28) trixie; urgency=medium
 
   * ZFS: actually revert the fix for memory-mapped files serving stale data
