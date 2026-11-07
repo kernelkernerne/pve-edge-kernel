@@ -1,0 +1,61 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: pve-edge-kernel <pve-edge-kernel@users.noreply.github.com>
+Date: Sat, 7 Nov 2026 17:45:00 +0530
+Subject: [PATCH] x86/cfi: Only poison real kCFI and FineIBT preambles
+
+apply_seal_endbr() calls poison_cfi() for every function in
+.ibt_endbr_seal, which objtool also generates for code that was not
+compiled with kCFI, such as binary blobs linked into out-of-tree
+modules. poison_cfi() takes the 16 bytes in front of such a function for
+a kCFI preamble if the first byte is a MOV imm32 opcode, and for a
+FineIBT preamble if it is an ENDBR. In such code, these bytes are the
+tail of the preceding function, which then gets its MOV immediate or
+its ENDBR and the following instruction overwritten.
+
+With the NVIDIA vGPU host driver 595.91.04 on a kCFI kernel, this
+corrupted 525 functions of its precompiled resource manager, most of
+them by replacing the return value in "mov $1, %eax", and GPU
+initialization failed with RmInitAdapter 0x22:0x40 (NV_ERR_INVALID_STATE)
+without any CFI failure. With FineIBT, 1399 functions of the same
+module would be hit.
+
+Also check the NOP padding of kCFI preambles, and the SUBL following
+the ENDBR of FineIBT preambles.
+
+---
+ arch/x86/kernel/alternative.c | 15 +++++++++++----
+ 1 file changed, 11 insertions(+), 4 deletions(-)
+
+--- a/arch/x86/kernel/alternative.c
++++ b/arch/x86/kernel/alternative.c
+@@ -1921,9 +1921,11 @@
+ 		addr += CFI_OFFSET - fineibt_prefix_size;
+ 
+ 		/*
+-		 * FineIBT prefix should start with an ENDBR.
++		 * FineIBT prefix should start with an ENDBR, followed by the
++		 * SUBL of the hash. An ENDBR alone might as well be the start
++		 * of a preceding function, in code not compiled with kCFI.
+ 		 */
+-		if (!is_endbr(addr))
++		if (!is_endbr(addr) || *(u8 *)(addr + fineibt_preamble_hash - 1) != 0x2d)
+ 			break;
+ 
+ 		/*
+@@ -1940,9 +1942,14 @@
+ 
+ 	case CFI_KCFI:
+ 		/*
+-		 * kCFI prefix should start with a valid hash.
++		 * kCFI prefix should start with a valid hash, followed by NOP
++		 * padding. Without checking the padding, the tail of a preceding
++		 * function in code not compiled with kCFI, e.g. a binary blob
++		 * linked into an out-of-tree module, could match and get
++		 * scribbled over.
+ 		 */
+-		if (!decode_preamble_hash(addr, NULL))
++		if (!decode_preamble_hash(addr, NULL) ||
++		    (CFI_OFFSET > 5 && memchr_inv(addr + 5, 0x90, CFI_OFFSET - 5)))
+ 			break;
+ 
+ 		/*
