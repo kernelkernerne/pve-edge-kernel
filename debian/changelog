@@ -31,6 +31,253 @@ proxmox-kernel-edge-7.2 (7.2.11-1) trixie; urgency=medium
 
  -- pve-edge-kernel <pve-edge-kernel@users.noreply.github.com>  Fri, 16 Oct 2026 15:30:00 +0530
 
+proxmox-kernel-7.0 (7.0.14-29) trixie; urgency=medium
+
+  * fix #8121: NFS server: fix server-side copies of larger files by NFS 4.2
+    clients, for example with cp, hanging since 7.0.14-20. Clients with a
+    kernel older than 6.15 waited forever, newer ones at least three seconds
+    per copy. The copied data was not affected.
+
+  * btrfs: stop logging false "unable to release extent buffer" warnings on
+    every unmount since 7.0.14-25, and avoid a false IO error from fsync
+    after a direct write that fell back to buffered IO.
+
+  * KSM: fix possible data loss in merged memory, for example of VMs, under
+    memory pressure, after a process used MADV_FREE on one of the merged
+    pages.
+
+  * CIFS: fix data corruption when a file gets truncated on open while it is
+    being written, and the file appearing empty to the client after such an
+    open failed.
+
+  * amdgpu: keep Navi 1x and 2x GPUs usable after switching them from amdgpu
+    to vfio-pci for passthrough. With runtime power management and the audio
+    function enabled, they could become unreachable after the next reset.
+
+  * netfilter: nftables rules that rewrite packet headers or payload, and
+    NFQUEUE verdicts with modified packets, now fail with "Operation not
+    permitted" in unprivileged containers, as such rewrites could corrupt
+    header fields that the network stack had already validated. Newer
+    upstream kernels behave the same.
+
+  * tun: require CAP_NET_ADMIN to attach to a TUN/TAP device that has
+    neither an owner nor a group set, as any local user could read and
+    inject its traffic otherwise. Unprivileged processes using such a
+    device, for example VPN daemons that drop their privileges, need an
+    owner or group set on it. VMs are not affected.
+
+  * fix use-after-free bugs that local users, including root in unprivileged
+    containers, could trigger in the PAGEMAP_SCAN ioctl, coredumps, page
+    faults, file delegations, IPv6 route dumps, IP fragment reassembly, the
+    QFQ packet scheduler, IPv6 multicast routing, MPTCP and the teardown of
+    network namespaces.
+
+  * net: fix bugs that local users, root in unprivileged containers or
+    remote peers could trigger:
+    - SCTP: two crashes, which a remote peer or a local user could trigger.
+    - CAN: a crash through ISO-TP sockets, which local users could trigger.
+    - TCP: a crash in socket lookups under load with SYN cookies, and a
+      use-after-free in request migration with the tcp_migrate_req sysctl
+      enabled.
+    - IPsec: reassembled packets were accepted when only some of their
+      fragments were authenticated.
+    - TIPC: a device reference leak that root in a container could use to
+      block network configuration on the host, and a heap overflow and a
+      crash with unusual MTUs. Bearers on devices with an MTU too small for
+      the TIPC headers or above 65535 are now refused.
+    - netlink: information about kernel addresses leaked to local users.
+
+  * fix hangs that local users could cause: system calls looping in the
+    kernel on MAP_DROPPABLE memory in a full memory cgroup or on overflowing
+    io_uring completions, and closed io_uring SQPOLL rings of a stopped
+    process blocking the cleanup of all others.
+
+  * bpf: require the file descriptor of a cgroup BPF program or a capability
+    on the host to detach it. So far, local users could detach programs that
+    were attached without support for multiple programs.
+
+  * mm: fix page table walks of the multi-gen LRU using stale page table
+    entries, and a race of truncate with the unmapping of transparent huge
+    pages. Charge NUMA memory policies of shared memory to the memory
+    cgroup, so containers cannot use them to exceed their memory limit.
+
+  * KVM: limit the shadow page lists that a guest can build up, which let
+    guests with nested virtualization keep a host CPU busy for a long time.
+
+  * crypto: fix a use-after-free in the ESSIV template with asynchronous
+    AEAD implementations.
+
+  * NFS: fix operations on a directory failing with ENOENT after an attempt
+    to create it failed, for example because it already existed.
+
+ -- Proxmox Support Team <support@proxmox.com>  Fri, 06 Nov 2026 17:55:43 +0100
+
+proxmox-kernel-7.0 (7.0.14-28) trixie; urgency=medium
+
+  * ZFS: actually revert the fix for memory-mapped files serving stale data
+    after a rollback or receive (#7653). The 7.0.14-27 package still
+    contained it, as its build reused outdated ZFS sources, so receives and
+    rollbacks into mounted datasets could still deadlock as described there.
+
+  * fix #8264: net: fix a kernel crash when creating an ipip tunnel, which
+    hung all networking on the host until a reset since 7.0.14-25. Root in
+    an unprivileged container could trigger it too.
+
+  * amdgpu: stop logging a harmless warning with a stack trace on every boot
+    of some systems with AMD APUs, for example on ASRock Rack server boards,
+    whose firmware lists display outputs without hot-plug detection.
+
+  * e1000e: work around a hardware erratum that made Intel I219 NICs send
+    corrupted data and then hang ("Detected Hardware Unit Hang") with TCP
+    segmentation offload, triggered for example by forwarding VM traffic
+    over a bridge. Disabling TSO as a workaround should no longer be
+    needed.
+
+  * overlayfs: fix use-after-free bugs, a crash and an endless loop that
+    unprivileged users, also root in unprivileged containers, could trigger
+    with their own overlay mounts, and keep a change through an open
+    descriptor of a removed file from replacing whatever took its name in the
+    upper layer.
+
+  * fix a use-after-free in case-insensitive lookups on filesystems with
+    casefolding enabled, and races in io_uring on exec and coredumps,
+    including a use-after-free, that local users could trigger.
+
+  * net: fix an endless loop in SCTP that stalls a CPU, which a remote SCTP
+    peer or a local user could trigger, and memory corruption in VM sockets
+    (vsock). Also charge AF_XDP ring buffers to the memory cgroup that
+    creates them and bound an ebtables allocation, so that containers cannot
+    use these to exhaust the memory of the host.
+
+ -- Proxmox Support Team <support@proxmox.com>  Mon, 02 Nov 2026 12:54:27 +0100
+
+proxmox-kernel-7.0 (7.0.14-27) trixie; urgency=medium
+
+  * fix #8217: netfilter: flowtable: fall back to regular forwarding when the
+    forward path of a flow cannot be fully resolved, for example because the
+    egress device is not part of the flowtable. Such flows got offloaded with
+    an incomplete path, and packets sent out over VLAN devices lacked their
+    VLAN tag.
+
+  * ZFS: revert the fix for memory-mapped files serving stale data after a
+    rollback or receive (#7653) from 7.0.14-26. It could deadlock a receive
+    or rollback into a mounted dataset while programs accessed its files
+    through memory mappings, hanging all access to the dataset and blocking
+    reboots.
+
+  * net: revert a change from 7.0.14-18 that made TCP advertise the MSS of the
+    configured MTU instead of a smaller, already learned path MTU. Connections
+    from peers behind firewalls that drop ICMP could stall right after the
+    handshake.
+
+  * ksmbd: fix Windows clients failing to connect to the in-kernel SMB server
+    since 7.0.14-25. A change from the 6.18 stable kernel, which only fits
+    that kernel, broke the handling of the initial SMB1 style protocol
+    negotiation that Windows clients use. Linux clients were not affected.
+    Also fix an out-of-bounds read that clients could trigger during the
+    protocol negotiation, before authenticating, and keep ksmbd from listening
+    in the network namespaces of containers when no interface list is
+    configured, which made the host's shares reachable from container
+    networks.
+
+  * KVM: fix nested virtualization on AMD hosts possibly letting vCPUs of
+    different guests share an address space identifier on the same CPU, which
+    breaks the TLB isolation between them. Also keep nested guests from setting
+    up a long mode state that the KVM MMU does not expect, reject that state
+    when restoring nested virtualization state, for example on live migration,
+    and stop only the affected VM instead of crashing the host should the MMU
+    still encounter paging state it cannot handle.
+
+  * net: fix a bug that let unprivileged users modify the in-memory contents
+    of files they can only read, like files owned by root, through IPsec. The
+    base already had a fix for this, which missed one path.
+
+  * net: fix out-of-bounds accesses, use-after-free bugs and crashes in packet
+    receive, netfilter reject rules, TCP, IPv4 multipath routing, raw IPv6
+    sockets on VRF devices, packet sockets, xfrm interfaces, IP-TFS and the tc
+    flower classifier, and a kernel memory leak to netlink sockets with packet
+    filters. Some of these could be triggered by guests or by root in
+    unprivileged containers.
+
+  * iSCSI: fix kernel crashes that a malicious or faulty iSCSI target could
+    trigger in the initiator, and a case where such a target could make a
+    pending read succeed without delivering any data.
+
+  * mm: fix use-after-free bugs in swap-in, in the reclaim of lazily freed
+    transparent huge pages, where the latter could also lose data, and in
+    collapsing file-backed memory into huge pages, which unprivileged users
+    could trigger.
+
+  * fix a CPU lockup in the UMIP instruction emulation, use-after-free bugs in
+    io_uring, in pipes and in the resource limit accounting of user
+    namespaces, kernel crashes in asynchronous I/O and, on btrfs and f2fs, in
+    io_uring, an out-of-bounds read in direct I/O, information leaks in the
+    crypto socket interface and in overlayfs, and a bug that let users make
+    any file fail to execute by storing an empty file capability on it, all
+    reachable by unprivileged users, also from within containers.
+
+ -- Proxmox Support Team <support@proxmox.com>  Sat, 31 Oct 2026 15:20:57 +0100
+
+proxmox-kernel-7.0 (7.0.14-26) trixie; urgency=medium
+
+  * fix #8153: revert a CXL change that broke building the NVIDIA open GPU
+    kernel modules since 7.0.14-20.
+
+  * fix #7653: ZFS: fix memory-mapped files serving stale data after a
+    rollback or a receive into their mounted dataset, which could affect
+    containers after storage replication or migration. The data on disk was
+    not affected.
+
+  * fix #8178: ZFS: fix a race in the ARC that could cause a kernel panic and
+    leave the pool hung, seen on nodes receiving storage replication into
+    encrypted datasets.
+
+  * ZFS: fix possible crashes while data is being written to L2ARC cache
+    devices.
+
+  * ZFS: let symlinks, device nodes and FIFOs inherit the project ID too and
+    allow renames within a directory under project quota inheritance, fixing
+    commands like "ln -sfn" failing there with "Invalid cross-device link".
+    Such newly created objects now count towards the project quota.
+
+  * cgroup: fix processes being killed right after creation when cloned
+    directly into a cgroup that cgroup.kill was used on before, as LXC does
+    when starting containers.
+
+  * fs: fix file creation with O_CREAT spuriously failing with "No such file
+    or directory" under concurrent access.
+
+  * dm-crypt: fix a race that could report failed I/O as successful.
+
+  * x86: fix a possible kernel panic when running as a KVM guest, for example
+    in nested setups.
+
+  * KVM: avoid discarding page tables that nested guests still use when
+    reclaiming shadow pages.
+
+  * fix a crash and a hang that local users could trigger through inotify and
+    io_uring, and a CPU lockup through AIO polling.
+
+  * net/sched: fix an out-of-bounds read when setting up tc flower filters,
+    which users with network admin rights, for example in containers, could
+    trigger.
+
+ -- Proxmox Support Team <support@proxmox.com>  Thu, 22 Oct 2026 20:45:24 +0200
+
+proxmox-kernel-7.0 (7.0.14-25) trixie; urgency=medium
+
+  * update sources to Ubuntu-7.0.0-43.43i1, based on the upstream stable
+    releases up to v7.2.9 and v6.18.55 and carrying many additional security
+    fixes.
+
+  * KVM: fix issues that guests could use to crash the host or make it access
+    memory out of bounds, affecting nested virtualization and Windows guests
+    using Hyper-V on AMD hosts.
+
+  * net/sched: fix a use-after-free when releasing traffic control actions.
+
+ -- Proxmox Support Team <support@proxmox.com>  Sat, 17 Oct 2026 22:42:55 +0200
+
 proxmox-kernel-7.0 (7.0.14-24) trixie; urgency=medium
 
   * fix #7969: PCI: revert a change that made the kernel lift the 2.5GT/s
