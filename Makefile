@@ -87,10 +87,14 @@ LINUX_TOOLS_DBG_DEB=linux-tools-$(KERNEL_MAJMIN)-dbgsym_$(DEB_VERSION)_$(ARCH).d
 DEBS=$(DST_DEB) $(META_DEB) $(HDR_DEB) $(META_HDR_DEB) $(LINUX_TOOLS_DEB) $(LINUX_TOOLS_DBG_DEB) $(SIGNED_TEMPLATE_DEB) # $(USR_HDR_DEB)
 
 all: deb
+# lintian takes 15+ minutes on the kernel package; set EDGE_LINTIAN=0 to skip it
+EDGE_LINTIAN ?= 1
 deb: $(DEBS)
+ifneq ($(EDGE_LINTIAN),0)
 	lintian $(DST_DEB)
 	#lintian $(HDR_DEB)
 	lintian $(LINUX_TOOLS_DEB)
+endif
 
 $(META_DEB) $(META_HDR_DEB) $(LINUX_TOOLS_DEB) $(HDR_DEB) $(DST_DEB) &: $(BUILD_DIR).prepared
 	cd $(BUILD_DIR); dpkg-buildpackage --jobs=auto -b -uc -us

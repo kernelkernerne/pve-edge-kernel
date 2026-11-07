@@ -21,12 +21,17 @@ proxmox-kernel-edge-7.3 (7.3.3-1) trixie; urgency=medium
       containers, 32-bit binaries and loading unsigned DKMS modules, and do not
       panic on an oops.
 
+  * allow skipping lintian with EDGE_LINTIAN=0.
+
   * ship the struct layout seed of the built kernel in the headers package and
     make LLVM=1, as used by DKMS, build with LLVM 23.
 
   * kCFI: fix building GPL-incompatible modules, such as ZFS and NVIDIA, which
     failed modpost on the GPL-only __clear_pages_unrolled(), referenced by
     KCFI_REFERENCE() in every module (patch sent upstream).
+
+  * downgrade the W^X warning for the boot-time ITS thunk page, which kCFI
+    without IBT triggers on Ice Lake, to a pr_warn(), as in mainline 7.4.
 
   * ZFS: apply openzfs/zfs#19562, which calls the x86_64 AES assembly through
     C wrappers, as an indirect call into the assembly fails kCFI.
