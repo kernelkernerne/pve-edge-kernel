@@ -1,3 +1,37 @@
+proxmox-kernel-edge-7.3 (7.3.3-1) trixie; urgency=medium
+
+  * update to Linux 7.3.3 from kernel.org.
+
+  * build with Clang/LLVM 23 and ThinLTO by default; the toolchain, LLVM
+    version and LTO mode are selectable with EDGE_TOOLCHAIN, EDGE_LLVM_VERSION
+    and EDGE_LTO. Rust support is disabled for LTO builds, as LTO together
+    with BTF rules it out; it only provided the qt2025 PHY driver.
+
+  * out-of-tree modules for this kernel, like DKMS ones, must be built with the
+    same toolchain, i.e. LLVM=-23; the headers package recommends it.
+
+  * ZFS: update to zfs-linux 2.4.4-pve1 with the Linux 7.3 compat backports,
+    and build it with --enable-linux-experimental, as upstream does not
+    declare 7.3 support yet.
+
+  * patch queue rebased onto 7.3.3, merging Proxmox VE kernel 7.0.14-29:
+    - add 43 fixes from the Proxmox VE kernel that are not part of 7.3.3,
+      among them fixes for memory management, io_uring/aio, netfilter, IPv6,
+      TIPC, CAN ISO-TP, MPTCP, KVM, BPF, crypto, e1000e and amdgpu.
+    - take the upstream commits for the nf_reject IPCB, huge_memory truncate
+      and inet fragment reassembly fixes, which apply to 7.3.3 as they are.
+    - drop the bridge mcast, KVM vcpu_id and PID-pointer table and btrfs
+      reloc root fixes, which are part of 7.3.3.
+    - do not take fixes for problems of the Ubuntu base that 7.3.3 does not
+      have: the misplaced ipip CAP_NET_ADMIN check, the incomplete btrfs
+      false IO failure backport, the ksmbd rfc1002 revert, the nfsd
+      CB_OFFLOAD stateid and the CXL soft reserved region revert. Dropping the
+      ipip check would remove the correctly placed one in vanilla 7.3.3.
+    - do not take the KVM nSVM EFER.LMA, skb_zerocopy shared-frag and
+      create_io_thread() fixes, which are part of 7.3.3 already.
+
+ -- pve-edge-kernel <pve-edge-kernel@users.noreply.github.com>  Sat, 07 Nov 2026 12:30:00 +0530
+
 proxmox-kernel-edge-7.2 (7.2.11-1) trixie; urgency=medium
 
   * rebase onto vanilla Linux 7.2.11 from kernel.org instead of the Ubuntu

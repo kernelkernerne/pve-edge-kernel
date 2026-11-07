@@ -2,8 +2,8 @@ include /usr/share/dpkg/pkg-info.mk
 
 # also bump proxmox-kernel-meta if the default MAJ.MIN version changes!
 KERNEL_MAJ=7
-KERNEL_MIN=2
-KERNEL_PATCHLEVEL=11
+KERNEL_MIN=3
+KERNEL_PATCHLEVEL=3
 # increment KREL for every published package release!
 # rebuild packages with new KREL and run 'make abiupdate'
 KREL=1
@@ -11,15 +11,24 @@ KREL=1
 # Use to create a separate package for the same version, like -bpoXY for backport or test-$foo.
 # This way the package can be co-installed with the original, a requirement for major dist updates.
 KREL_EXTRA=-edge
+# Normally empty, but allows adding a part just for the debian package revision, like ~bpoXY+Z.
+# For the kernel pkg itself it wouldn't matter, but for the meta pkgs it allows major dist upgrades.
+PKG_REV_EXTRA=
 
 # x86-64 CPU optimization target (amd64 only):
 #   icelake-server - Sunny Cove / 3rd gen Xeon Scalable (CONFIG_X86_MARCH_ICELAKE_SERVER)
 #   native         - CPU of the build host (CONFIG_X86_NATIVE_CPU)
 #   generic        - baseline x86-64, runs on any machine
 EDGE_MARCH ?= icelake-server
-# Normally empty, but allows adding a part just for the debian package revision, like ~bpoXY+Z.
-# For the kernel pkg itself it wouldn't matter, but for the meta pkgs it allows major dist upgrades.
-PKG_REV_EXTRA=
+
+# Compiler for the kernel and the ZFS modules:
+#   llvm - clang/ld.lld version EDGE_LLVM_VERSION (e.g. from apt.llvm.org)
+#   gcc  - the distribution GCC toolchain
+EDGE_TOOLCHAIN ?= llvm
+EDGE_LLVM_VERSION ?= 23
+# Clang link time optimization: thin, full or none. Ignored with gcc.
+# LTO together with BTF rules out Rust, so Rust support is disabled with LTO.
+EDGE_LTO ?= thin
 
 KERNEL_MAJMIN=$(KERNEL_MAJ).$(KERNEL_MIN)
 KERNEL_VER=$(KERNEL_MAJMIN).$(KERNEL_PATCHLEVEL)
@@ -62,7 +71,7 @@ MODULES=modules
 MODULE_DIRS=$(ZFSDIR)
 
 # exported to debian/rules via debian/rules.d/dirs.mk
-DIRS=KERNEL_SRC ZFSDIR MODULES EDGE_MARCH
+DIRS=KERNEL_SRC ZFSDIR MODULES EDGE_MARCH EDGE_TOOLCHAIN EDGE_LLVM_VERSION EDGE_LTO
 
 DSC=proxmox-kernel-$(KERNEL_SERIES)_$(DEB_VERSION).dsc
 DST_DEB=$(PACKAGE)_$(DEB_VERSION)_$(ARCH).deb

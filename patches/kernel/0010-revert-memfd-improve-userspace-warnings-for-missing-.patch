@@ -30,10 +30,10 @@ Signed-off-by: Thomas Lamprecht <t.lamprecht@proxmox.com>
  1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/mm/memfd.c b/mm/memfd.c
-index abe13b291ddc8b4441aba83def30f10411b51f5c..699a0ba16f23e10058e386ee1abeac7b4e3e1ebe 100644
+index c708d92533f4abd040360c5e4c9d2252eea236b5..ffc9f224e1c1b66c9e0f9ce3d186fd667374d61b 100644
 --- a/mm/memfd.c
 +++ b/mm/memfd.c
-@@ -355,7 +355,7 @@ static int check_sysctl_memfd_noexec(unsigned int *flags)
+@@ -356,7 +356,7 @@ static int check_sysctl_memfd_noexec(unsigned int *flags)
  	}
  
  	if (!(*flags & MFD_NOEXEC_SEAL) && sysctl >= MEMFD_NOEXEC_SCOPE_NOEXEC_ENFORCED) {

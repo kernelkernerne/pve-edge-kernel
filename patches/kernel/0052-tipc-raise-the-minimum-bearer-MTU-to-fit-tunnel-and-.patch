@@ -1,0 +1,144 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Joas Antonio dos Santos <joasantonio108@gmail.com>
+Date: Fri, 30 Oct 2026 20:53:04 -0300
+Subject: [PATCH] tipc: raise the minimum bearer MTU to fit tunnel and crypto
+ overhead
+
+A peer can lower the link MTU to TIPC_MIN_BEARER_MTU (100 bytes, plus
+the UDP encapsulation header) with the max_pkt field of a RESET or
+ACTIVATE message; tipc_link_proto_rcv() only checks the lower bound
+returned by tipc_bearer_min_mtu().  The same bound is applied to the
+device MTU when a bearer is enabled.
+
+That bound predates two later reductions of the link MSS:
+
+  tipc_link_mss() = mtu - INT_H_SIZE                    (tunnel header)
+                         - EMSG_OVERHEAD               (CONFIG_TIPC_CRYPTO)
+
+With CONFIG_TIPC_CRYPTO=y, which is the default, an MTU of 100 gives an
+MSS of 28.  Once the link comes up, tipc_named_node_up() calls
+named_distribute(), which computes
+
+  msg_dsz = ((tipc_node_get_mtu() - INT_H_SIZE) / ITEM_SIZE) * ITEM_SIZE;
+
+For an MSS of 28 the subtraction is negative and the result truncates to
+0xfffffff0; for an MSS between 40 and 59 it is 0.  named_prepare_buf()
+then allocates a buffer with no room for any item (the u32 size wraps),
+and msg_rem never reaches zero, so every cluster-scope publication on
+the node is written with publ_to_item() past the end of that one skb,
+over skb_shared_info and into adjacent memory.
+
+Without crypto the MSS is at least 60, which still does not hold the
+first fragment built by tipc_msg_build(): INT_H_SIZE fragment header
+plus a message header of up to MAX_H_SIZE.  With pktmax below that, the
+header copies run past the pktmax bytes allocated for the fragment.
+
+Raise TIPC_MIN_BEARER_MTU to MAX_H_SIZE + 2 * INT_H_SIZE so the MSS can
+always hold INT_H_SIZE + MAX_H_SIZE, which also leaves room for name
+table items, and add tipc_bearer_mtu_floor(), which adds EMSG_OVERHEAD
+on top for CONFIG_TIPC_CRYPTO=y.  Use it for the device MTU check
+(tipc_mtu_bad()), the UDP MTU check, the netlink MTU setting and
+tipc_bearer_min_mtu(), which also bounds the max_pkt negotiation.
+
+Found by manual code review and reproduced with KASAN using two network
+namespaces joined by a veth pair (see below).
+
+Fixes: fc1b6d6de220 ("tipc: introduce TIPC encryption & authentication")
+Fixes: 2320bcdae628 ("tipc: fix changeover issues due to large packet")
+Suggested-by: Tung Nguyen <tung.quang.nguyen@est.tech>
+Signed-off-by: Joas Antonio dos Santos <joasantonio108@gmail.com>
+Reviewed-by: Tung Nguyen <tung.quang.nguyen@est.tech>
+Link: https://patch.msgid.link/179340438471.4412.6707287163192409104@gmail.com
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+(cherry picked from commit 03897066069fd47caf2908183edf3b22b822ea73)
+Signed-off-by: Thomas Lamprecht <t.lamprecht@proxmox.com>
+---
+ net/tipc/bearer.c    | 17 +++++++++++++++--
+ net/tipc/bearer.h    |  9 ++++++---
+ net/tipc/udp_media.h |  2 +-
+ 3 files changed, 22 insertions(+), 6 deletions(-)
+
+diff --git a/net/tipc/bearer.c b/net/tipc/bearer.c
+index 9427e2a71ced9ac0d59b406d6825d337607029e6..7369e59c225e99cb468b0ab83eff1836257bdc6b 100644
+--- a/net/tipc/bearer.c
++++ b/net/tipc/bearer.c
+@@ -577,9 +577,22 @@ int tipc_bearer_mtu(struct net *net, u32 bearer_id)
+ 	return mtu;
+ }
+ 
++/* tipc_bearer_mtu_floor - smallest bearer MTU, excluding the media
++ * encapsulation header, that leaves room for a fragment header plus a
++ * full message header after the link MSS reductions (see tipc_link_mss())
++ */
++u32 tipc_bearer_mtu_floor(void)
++{
++#ifdef CONFIG_TIPC_CRYPTO
++	return TIPC_MIN_BEARER_MTU + EMSG_OVERHEAD;
++#else
++	return TIPC_MIN_BEARER_MTU;
++#endif
++}
++
+ int tipc_bearer_min_mtu(struct net *net, u32 bearer_id)
+ {
+-	int mtu = TIPC_MIN_BEARER_MTU;
++	int mtu = tipc_bearer_mtu_floor();
+ 	struct tipc_bearer *b;
+ 
+ 	rcu_read_lock();
+@@ -1191,7 +1204,7 @@ int __tipc_nl_bearer_set(struct sk_buff *skb, struct genl_info *info)
+ 			}
+ #ifdef CONFIG_TIPC_MEDIA_UDP
+ 			if (nla_get_u32(props[TIPC_NLA_PROP_MTU]) <
+-			    b->encap_hlen + TIPC_MIN_BEARER_MTU) {
++			    b->encap_hlen + tipc_bearer_mtu_floor()) {
+ 				NL_SET_ERR_MSG(info->extack,
+ 					       "MTU value is out-of-range");
+ 				return -EINVAL;
+diff --git a/net/tipc/bearer.h b/net/tipc/bearer.h
+index 9b287fc81f4dfdcd3f40b73f649928cb16a2879a..8ba62b2fe79093ad7ac0b495ee2f95042e560c34 100644
+--- a/net/tipc/bearer.h
++++ b/net/tipc/bearer.h
+@@ -60,8 +60,10 @@
+ #define TIPC_MEDIA_TYPE_IB	2
+ #define TIPC_MEDIA_TYPE_UDP	3
+ 
+-/* Minimum bearer MTU */
+-#define TIPC_MIN_BEARER_MTU	(MAX_H_SIZE + INT_H_SIZE)
++/* Minimum bearer MTU, not counting the crypto overhead, see
++ * tipc_bearer_mtu_floor()
++ */
++#define TIPC_MIN_BEARER_MTU	(MAX_H_SIZE + 2 * INT_H_SIZE)
+ 
+ /* Maximum bearer MTU
+  *
+@@ -240,6 +242,7 @@ void tipc_bearer_cleanup(void);
+ void tipc_bearer_stop(struct net *net);
+ int tipc_bearer_mtu(struct net *net, u32 bearer_id);
+ int tipc_bearer_min_mtu(struct net *net, u32 bearer_id);
++u32 tipc_bearer_mtu_floor(void);
+ bool tipc_bearer_bcast_support(struct net *net, u32 bearer_id);
+ void tipc_bearer_xmit_skb(struct net *net, u32 bearer_id,
+ 			  struct sk_buff *skb,
+@@ -264,7 +267,7 @@ static inline void tipc_loopback_trace(struct net *net,
+ /* check if device MTU is usable for tipc bearers */
+ static inline bool tipc_mtu_bad(struct net_device *dev)
+ {
+-	if (dev->mtu >= TIPC_MIN_BEARER_MTU &&
++	if (dev->mtu >= tipc_bearer_mtu_floor() &&
+ 	    dev->mtu <= TIPC_MAX_BEARER_MTU)
+ 		return false;
+ 	netdev_warn(dev, "MTU not usable for tipc bearer\n");
+diff --git a/net/tipc/udp_media.h b/net/tipc/udp_media.h
+index e7455cc73e16c0e3ff1f1b371427b4910ef6b395..030e00ad1629f5c4154f1882daac7d257cfcbf38 100644
+--- a/net/tipc/udp_media.h
++++ b/net/tipc/udp_media.h
+@@ -48,7 +48,7 @@ int tipc_udp_nl_dump_remoteip(struct sk_buff *skb, struct netlink_callback *cb);
+ /* check if configured MTU is too low for tipc headers */
+ static inline bool tipc_udp_mtu_bad(u32 mtu)
+ {
+-	if (mtu >= (TIPC_MIN_BEARER_MTU + sizeof(struct iphdr) +
++	if (mtu >= (tipc_bearer_mtu_floor() + sizeof(struct iphdr) +
+ 	    sizeof(struct udphdr)))
+ 		return false;
+ 

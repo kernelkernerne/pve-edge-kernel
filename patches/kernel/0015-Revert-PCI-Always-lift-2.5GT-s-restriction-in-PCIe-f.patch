@@ -26,7 +26,7 @@ Signed-off-by: Thomas Lamprecht <t.lamprecht@proxmox.com>
  1 file changed, 34 insertions(+), 21 deletions(-)
 
 diff --git a/drivers/pci/quirks.c b/drivers/pci/quirks.c
-index 6199681b125cc0304b2a7b4c7155a291307bd068..f05eb50d06b5a1bc765cf0ac539ec13ecb9219e0 100644
+index db12e37ae44714b74150a1e4dabfc7d02d42f692..1fd78ca0a6fb079310c68a30bad4ba56f49a6058 100644
 --- a/drivers/pci/quirks.c
 +++ b/drivers/pci/quirks.c
 @@ -80,10 +80,11 @@ static bool pcie_lbms_seen(struct pci_dev *dev, u16 lnksta)
