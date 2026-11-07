@@ -1,0 +1,29 @@
+From cf1e44eec76cf5a80861106df50c88f8b9caf51d Mon Sep 17 00:00:00 2001
+From: Cytops <cyridge@proton.me>
+Date: Sat, 24 Oct 2026 17:59:28 -0700
+Subject: [PATCH] zstdcheck: allow __cfi_ prefixed symbols
+
+On kernels built with CONFIG_CFI, clang emits a global __cfi_<func>
+symbol for each function's type-hash preamble, just as
+CONFIG_CALL_PADDING emits __pfx_<func>. check-zstd-symbols already
+accepts __pfx_zfs_*, but reports every __cfi_zfs_* symbol as an
+unprefixed zstd symbol, so make checkstyle fails on such kernels.
+Accept __cfi_zfs_* as well.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Signed-off-by: Cytops <cyridge@proton.me>
+---
+ module/Makefile.in | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/module/Makefile.in b/module/Makefile.in
+index 7a31b69cd4af..459222222fd2 100644
+--- a/module/Makefile.in
++++ b/module/Makefile.in
+@@ -187,4 +187,4 @@ gen-zstd-symbols:
+ 	for obj in $(addprefix zstd/,$(ZSTD_UPSTREAM_OBJS)); do echo; echo "/* $${obj#zstd/}: */"; @OBJDUMP@ -t $$obj | awk '$$2 == "g" && !/ zfs_/ {print "#define\t" $$6 " zfs_" $$6}' | sort; done >> zstd/include/zstd_compat_wrapper.h
+ 
+ check-zstd-symbols:
+-	@OBJDUMP@ -t $(addprefix zstd/,$(ZSTD_UPSTREAM_OBJS)) | awk '/file format/ {print}  $$2 == "g" && (!/ zfs_/ && !/ __pfx_zfs_/) {++ret; print}  END {exit ret}'
++	@OBJDUMP@ -t $(addprefix zstd/,$(ZSTD_UPSTREAM_OBJS)) | awk '/file format/ {print}  $$2 == "g" && (!/ zfs_/ && !/ __pfx_zfs_/ && !/ __cfi_zfs_/) {++ret; print}  END {exit ret}'
+

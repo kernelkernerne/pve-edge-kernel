@@ -1,0 +1,75 @@
+From f76bf5920ed1da73800ef7b00bd3c900db288863 Mon Sep 17 00:00:00 2001
+From: Cytops <cyridge@proton.me>
+Date: Fri, 30 Oct 2026 21:55:37 -0700
+Subject: [PATCH] icp: call armv7 SHA2 asm through C wrappers
+
+sha256_armv7_impl and sha512_armv7_impl stored the assembly entry
+points zfs_sha256_block_armv7() and zfs_sha512_block_armv7() directly
+in their ops tables. Assembly functions carry no kCFI type hash, so on
+an arm64 or arm kernel built with CONFIG_CFI every indirect call
+through ops->transform traps:
+
+  CFI failure at SHA2Update+0xe0/0x250 [zfs]
+  (target: zfs_sha256_block_armv7+0x0/0xe40 [zfs]; expected type: ...)
+
+On arm64 armv7 is typically the fastest SHA-512 implementation, as
+NEON is unavailable to zfs, so this hits every sha512 checksum.
+Call them from C wrappers, as the x64 implementation does. No
+kfpu_begin() is needed, as this code does not use NEON.
+
+Tested on Linux 7.3 arm64 with CONFIG_CFI=y and CONFIG_CFI_PERMISSIVE=y
+in QEMU: before, loading zfs.ko logged 1064 CFI failures from the
+checksum benchmark; after, none, and both armv7 implementations
+benchmark normally.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Signed-off-by: Cytops <cyridge@proton.me>
+---
+ module/icp/algs/sha2/sha256_impl.c | 9 ++++++++-
+ module/icp/algs/sha2/sha512_impl.c | 9 ++++++++-
+ 2 files changed, 16 insertions(+), 2 deletions(-)
+
+diff --git a/module/icp/algs/sha2/sha256_impl.c b/module/icp/algs/sha2/sha256_impl.c
+index 970100f98027..a1e14d6799bd 100644
+--- a/module/icp/algs/sha2/sha256_impl.c
++++ b/module/icp/algs/sha2/sha256_impl.c
+@@ -114,9 +114,16 @@ const sha256_ops_t sha256_shani_impl = {
+ 
+ #elif defined(__aarch64__) || defined(__arm__)
+ extern void zfs_sha256_block_armv7(uint32_t s[8], const void *, size_t);
++
++static inline void
++tf_sha256_armv7(uint32_t s[8], const void *d, size_t b)
++{
++	zfs_sha256_block_armv7(s, d, b);
++}
++
+ const sha256_ops_t sha256_armv7_impl = {
+ 	.is_supported = sha2_is_supported,
+-	.transform = zfs_sha256_block_armv7,
++	.transform = tf_sha256_armv7,
+ 	.name = "armv7"
+ };
+ 
+diff --git a/module/icp/algs/sha2/sha512_impl.c b/module/icp/algs/sha2/sha512_impl.c
+index 41863a233a10..0a6fb8a4e536 100644
+--- a/module/icp/algs/sha2/sha512_impl.c
++++ b/module/icp/algs/sha2/sha512_impl.c
+@@ -99,9 +99,16 @@ const sha512_ops_t sha512_sha512ext_impl = {
+ 
+ #elif defined(__aarch64__) || defined(__arm__)
+ extern void zfs_sha512_block_armv7(uint64_t s[8], const void *, size_t);
++
++static inline void
++tf_sha512_armv7(uint64_t s[8], const void *d, size_t b)
++{
++	zfs_sha512_block_armv7(s, d, b);
++}
++
+ const sha512_ops_t sha512_armv7_impl = {
+ 	.is_supported = sha2_is_supported,
+-	.transform = zfs_sha512_block_armv7,
++	.transform = tf_sha512_armv7,
+ 	.name = "armv7"
+ };
+ 

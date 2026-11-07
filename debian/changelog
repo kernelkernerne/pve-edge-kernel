@@ -24,6 +24,13 @@ proxmox-kernel-edge-7.3 (7.3.3-1) trixie; urgency=medium
   * ship the struct layout seed of the built kernel in the headers package and
     make LLVM=1, as used by DKMS, build with LLVM 23.
 
+  * kCFI: fix building GPL-incompatible modules, such as ZFS and NVIDIA, which
+    failed modpost on the GPL-only __clear_pages_unrolled(), referenced by
+    KCFI_REFERENCE() in every module (patch sent upstream).
+
+  * ZFS: apply openzfs/zfs#19562, which calls the x86_64 AES assembly through
+    C wrappers, as an indirect call into the assembly fails kCFI.
+
   * build with Clang/LLVM 23 and ThinLTO by default; the toolchain, LLVM
     version and LTO mode are selectable with EDGE_TOOLCHAIN, EDGE_LLVM_VERSION
     and EDGE_LTO. Rust support is disabled for LTO builds, as LTO together

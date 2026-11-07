@@ -1,0 +1,66 @@
+From f431df3ab794e727b462267d8d6a2fb4c9c11ea5 Mon Sep 17 00:00:00 2001
+From: Cytops <cyridge@proton.me>
+Date: Sat, 24 Oct 2026 17:59:28 -0700
+Subject: [PATCH] icp: call x86_64 AES asm through C wrappers
+
+aes_x86_64_impl stored the assembly entry points aes_encrypt_amd64()
+and aes_decrypt_amd64() directly in its ops table. Assembly functions
+carry no kCFI type hash, so on a kernel built with CONFIG_CFI every
+indirect call through ops->encrypt/decrypt traps:
+
+  CFI failure at aes_encrypt_block+0xf4/0x120 [zfs]
+  (target: aes_encrypt_amd64+0x0/0x9f0 [zfs]; expected type: ...)
+
+The path is used when AES-NI is unavailable or icp_aes_impl=x86_64.
+Call them from C wrappers, as the SHA2 and BLAKE3 code already does.
+
+Tested on Linux 7.3 with CONFIG_CFI=y and CONFIG_CFI_PERMISSIVE=y in
+a VM with icp_aes_impl=x86_64 and icp_gcm_impl=generic: before, ~47k
+CFI failures during encrypted dataset I/O; after, none, and
+create/write/scrub/export/import/load-key of AES-GCM and AES-CCM
+datasets succeeds with no pool errors.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Signed-off-by: Cytops <cyridge@proton.me>
+---
+ module/icp/algs/aes/aes_impl_x86-64.c | 19 +++++++++++++++++--
+ 1 file changed, 17 insertions(+), 2 deletions(-)
+
+diff --git a/module/icp/algs/aes/aes_impl_x86-64.c b/module/icp/algs/aes/aes_impl_x86-64.c
+index 9f89d74cb829..4581749f4931 100644
+--- a/module/icp/algs/aes/aes_impl_x86-64.c
++++ b/module/icp/algs/aes/aes_impl_x86-64.c
+@@ -36,6 +36,21 @@ aes_x86_64_generate(aes_key_t *key, const uint32_t *keyarr32, int keybits)
+ 	    keyarr32, keybits);
+ }
+ 
++/* Users of ASMABI requires all calls to be from wrappers */
++static void
++aes_x86_64_encrypt(const uint32_t rk[], int Nr, const uint32_t pt[4],
++    uint32_t ct[4])
++{
++	aes_encrypt_amd64(rk, Nr, pt, ct);
++}
++
++static void
++aes_x86_64_decrypt(const uint32_t rk[], int Nr, const uint32_t ct[4],
++    uint32_t pt[4])
++{
++	aes_decrypt_amd64(rk, Nr, ct, pt);
++}
++
+ static boolean_t
+ aes_x86_64_will_work(void)
+ {
+@@ -44,8 +59,8 @@ aes_x86_64_will_work(void)
+ 
+ const aes_impl_ops_t aes_x86_64_impl = {
+ 	.generate = &aes_x86_64_generate,
+-	.encrypt = &aes_encrypt_amd64,
+-	.decrypt = &aes_decrypt_amd64,
++	.encrypt = &aes_x86_64_encrypt,
++	.decrypt = &aes_x86_64_decrypt,
+ 	.is_supported = &aes_x86_64_will_work,
+ 	.needs_byteswap = B_FALSE,
+ 	.name = "x86_64"
+

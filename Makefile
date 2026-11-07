@@ -156,12 +156,18 @@ $(KERNEL_SRC).prepared: upstream/$(KERNEL_TARBALL) $(KERNEL_CFG_FILES)
 $(MODULES).prepared: $(addsuffix .prepared,$(MODULE_DIRS))
 	touch $@
 
-$(ZFSDIR).prepared: $(ZFSONLINUX_SUBMODULE) | submodule
+$(ZFSDIR).prepared: $(ZFSONLINUX_SUBMODULE) $(wildcard patches/zfs/*.patch) | submodule
 	rm -rf $(BUILD_DIR)/$(MODULES)/$(ZFSDIR) $(BUILD_DIR)/$(MODULES)/tmp $@
 	mkdir -p $(BUILD_DIR)/$(MODULES)/tmp
 	cp -a $(ZFSONLINUX_SUBMODULE)/* $(BUILD_DIR)/$(MODULES)/tmp
 	cd $(BUILD_DIR)/$(MODULES)/tmp; make kernel
 	rm -rf $(BUILD_DIR)/$(MODULES)/tmp
+	# edge specific ZFS patches, on top of the zfs-linux ones
+	set -e; cd $(BUILD_DIR)/$(MODULES)/$(ZFSDIR); \
+	  for patch in $(addprefix $(CURDIR)/,$(sort $(wildcard patches/zfs/*.patch))); do \
+	    echo "applying patch '$$patch'"; \
+	    patch --batch --forward -p1 < "$${patch}"; \
+	  done
 	touch $(ZFSDIR).prepared
 
 .PHONY: distclean
