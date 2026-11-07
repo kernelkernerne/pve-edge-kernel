@@ -1,3 +1,12 @@
+proxmox-kernel-edge-7.3 (7.3.3-2) trixie; urgency=medium
+
+  * kCFI: only poison real kCFI and FineIBT function preambles when sealing.
+    Sealing scribbled over the tail of preceding functions in code not
+    compiled with kCFI, which broke the precompiled part of the NVIDIA
+    driver, and GPU initialization failed with RmInitAdapter 0x22:0x40.
+
+ -- pve-edge-kernel <pve-edge-kernel@users.noreply.github.com>  Sat, 07 Nov 2026 18:00:00 +0530
+
 proxmox-kernel-edge-7.3 (7.3.3-1) trixie; urgency=medium
 
   * update to Linux 7.3.3 from kernel.org.
@@ -34,11 +43,6 @@ proxmox-kernel-edge-7.3 (7.3.3-1) trixie; urgency=medium
 
   * downgrade the W^X warning for the boot-time ITS thunk page, which kCFI
     without IBT triggers on Ice Lake, to a pr_warn(), as in mainline 7.4.
-
-  * kCFI: only poison real kCFI and FineIBT function preambles when sealing.
-    Sealing scribbled over the tail of preceding functions in code not
-    compiled with kCFI, which broke the precompiled part of the NVIDIA
-    driver, and GPU initialization failed with RmInitAdapter 0x22:0x40.
 
   * ZFS: apply openzfs/zfs#19562, which calls the x86_64 AES assembly through
     C wrappers, as an indirect call into the assembly fails kCFI.
