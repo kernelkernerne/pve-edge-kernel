@@ -1,0 +1,168 @@
+# Kernel config policy for pve-edge-kernel (amd64), applied by debian/scripts/edge-config.
+#
+# Both source configs are first updated to the kernel tree with olddefconfig:
+#   proxmox-amd64.config         - Proxmox VE kernel config (base)
+#   linux-hardened-amd64.config  - Arch Linux linux-hardened config, from
+#     https://gitlab.archlinux.org/archlinux/packaging/packages/linux-hardened
+#     (config.x86_64 at 7de287fcb4742110581af1f1e81cf875da53dcd4, 7.2.10.hardened1-4)
+#
+# Every symbol keeps its Proxmox value, except:
+#   hardened SYMBOL   - take the value from the linux-hardened config
+#   set SYMBOL=VALUE  - explicit value (y, m, n, number or "string")
+#
+# The policy takes precedence over the options from debian/rules.d. After olddefconfig,
+# every symbol listed here is verified to have the requested value.
+
+## x86
+hardened LEGACY_VSYSCALL_NONE
+hardened LEGACY_VSYSCALL_XONLY
+hardened MODIFY_LDT_SYSCALL
+hardened X86_16BIT
+hardened MITIGATION_GDS
+hardened X86_MCELOG_LEGACY
+hardened EFI_RUNTIME_MAP
+hardened ARCH_MEMORY_PROBE
+hardened KVM_SW_PROTECTED_VM
+
+## no replacing or dumping the running kernel
+hardened KEXEC
+hardened KEXEC_FILE
+hardened KEXEC_JUMP
+hardened CRASH_DUMP
+hardened PROC_VMCORE
+hardened PROC_KCORE
+hardened KEXEC_HANDOVER
+hardened LIVEUPDATE
+hardened LIVEPATCH
+hardened HIBERNATION
+hardened PM_ADVANCED_DEBUG
+hardened PM_WAKELOCKS
+
+## legacy or rarely needed interfaces
+hardened CHECKPOINT_RESTORE
+hardened MEM_SOFT_DIRTY
+hardened SYSFS_SYSCALL
+hardened UID16
+hardened DEVMEM
+hardened DEVPORT
+hardened HPET_MMAP
+hardened UEVENT_HELPER
+hardened FW_LOADER_USER_HELPER
+# selects FW_LOADER_USER_HELPER
+hardened DELL_RBU
+hardened TTY_PRINTK
+hardened CONSOLE_POLL
+hardened XFRM_USER_COMPAT
+set KGDB=n
+set ACPI_TABLE_UPGRADE=n
+
+## debugging, testing and fault injection interfaces
+hardened ACPI_DEBUG
+hardened ACPI_DEBUGGER
+hardened ACPI_EC_DEBUGFS
+hardened ACPI_PFRUT
+hardened EFI_TEST
+hardened DEBUG_FS_ALLOW_ALL
+hardened DEBUG_FS_ALLOW_NONE
+hardened TRACE_EVENT_INJECT
+hardened BPF_KPROBE_OVERRIDE
+hardened USER_EVENTS
+hardened RV
+hardened TEST_BPF
+hardened NOTIFIER_ERROR_INJECTION
+hardened CACHEFILES_ERROR_INJECTION
+hardened CRYPTO_BENCHMARK
+hardened PKCS7_TEST_KEY
+hardened CRYPTO_KRB5_SELFTESTS
+hardened SAMPLES
+hardened IO_URING_MOCK_FILE
+hardened RXPERF
+hardened BT_DEBUGFS
+hardened MAC80211_DEBUGFS
+hardened CFG80211_DEBUGFS
+hardened L2TP_DEBUGFS
+hardened MAGIC_SYSRQ_DEFAULT_ENABLE
+
+## parsers for data from guests and removable media: drop exotic partition tables,
+## file systems and network protocols
+hardened AMIGA_PARTITION
+hardened ATARI_PARTITION
+hardened CMDLINE_PARTITION
+hardened OSF_PARTITION
+hardened SGI_PARTITION
+hardened SUN_PARTITION
+hardened SYSV68_PARTITION
+hardened ULTRIX_PARTITION
+hardened UNIXWARE_DISKLABEL
+hardened ADFS_FS
+hardened BFS_FS
+hardened HPFS_FS
+hardened QNX4FS_FS
+hardened QNX6FS_FS
+hardened OVERLAY_FS_REDIRECT_ALWAYS_FOLLOW
+hardened CIFS_ALLOW_INSECURE_LEGACY
+hardened IP_SCTP
+hardened X25
+hardened LAPB
+
+## IOMMU: strict TLB invalidation, no unsafe no-IOMMU modes
+hardened IOMMU_DEFAULT_DMA_LAZY
+hardened IOMMU_DEFAULT_DMA_STRICT
+hardened IOMMUFD_NOIOMMU
+hardened VFIO_NOIOMMU
+
+## memory and slab hardening
+hardened SLAB_CANARY
+hardened SLAB_MERGE_DEFAULT
+hardened INIT_ON_FREE_DEFAULT_ON
+hardened BUG_ON_DATA_CORRUPTION
+hardened KSTACK_ERASE
+hardened KFENCE_SAMPLE_INTERVAL
+hardened KFENCE_DEFERRABLE
+hardened DEBUG_SG
+hardened DEBUG_NOTIFIERS
+hardened DEBUG_VIRTUAL
+hardened DEBUG_RODATA_TEST
+set INIT_ON_ALLOC_DEFAULT_ON=y
+set SLAB_SANITIZE_VERIFY=y
+set PAGE_SANITIZE_VERIFY=y
+set KFENCE_BUG_ON_DATA_CORRUPTION=y
+set PAGE_TABLE_CHECK=y
+set PAGE_TABLE_CHECK_ENFORCED=y
+set SHUFFLE_PAGE_ALLOCATOR=y
+set ZERO_CALL_USED_REGS=y
+set RANDSTRUCT_NONE=n
+set RANDSTRUCT_PERFORMANCE=n
+set RANDSTRUCT_FULL=y
+
+## security modules and other security options
+hardened LSM_MMAP_MIN_ADDR
+hardened MSEAL_SYSTEM_MAPPINGS
+hardened PROC_MEM_ALWAYS_FORCE
+hardened PROC_MEM_FORCE_PTRACE
+hardened PROC_MEM_NO_FORCE
+hardened INTEL_TXT
+hardened USER_DECRYPTED_DATA
+hardened SYSTEM_BLACKLIST_AUTH_UPDATE
+set LSM="landlock,lockdown,yama,integrity,apparmor,bpf"
+set SECURITY_PERF_EVENTS_RESTRICT=y
+set SECURITY_TIOCSTI_RESTRICT=y
+set TCP_SIMULT_CONNECT_DEFAULT_ON=n
+set DEBUG_WRITABLE_FUNCTION_POINTERS_VERBOSE=n
+
+## control flow integrity: kCFI, as FineIBT where IBT is available
+set X86_KERNEL_IBT=y
+set CFI=y
+set CFI_PERMISSIVE=n
+
+## compatibility with Proxmox VE workloads
+# an oops kills the offending task instead of the whole host
+set PANIC_ON_OOPS=n
+# user namespaces and overlayfs for unprivileged and nested containers
+set USER_NS_UNPRIVILEGED=y
+set OVERLAY_FS_UNPRIVILEGED=y
+# 32-bit binaries in guests and containers
+set IA32_EMULATION=y
+# modules signed by DKMS are optional, the kernel is not locked down
+set MODULE_SIG_FORCE=n
+set LOCK_DOWN_KERNEL_FORCE_NONE=y

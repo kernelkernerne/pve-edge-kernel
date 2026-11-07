@@ -1,0 +1,23 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Daniel Micay <danielmicay@gmail.com>
+Date: Thu, 4 May 2017 18:11:52 -0400
+Subject: [PATCH] disable X86_16BIT by default
+
+Signed-off-by: Daniel Micay <danielmicay@gmail.com>
+(cherry picked from commit 4833b552f43633108104e36fc9a5b63c4cfc3b38)
+---
+ arch/x86/Kconfig | 1 -
+ 1 file changed, 1 deletion(-)
+
+diff --git a/arch/x86/Kconfig b/arch/x86/Kconfig
+index 38e3150b7c2b18aa28d6a0c681425a383d390e8d..b477a9ab978494cd8c4ae34c309b4890a72917ab 100644
+--- a/arch/x86/Kconfig
++++ b/arch/x86/Kconfig
+@@ -1230,7 +1230,6 @@ config VM86
+ 
+ config X86_16BIT
+ 	bool "Enable support for 16-bit segments"
+-	default y
+ 	depends on MODIFY_LDT_SYSCALL
+ 	help
+ 	  This option is required by programs like Wine to run 16-bit

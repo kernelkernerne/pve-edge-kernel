@@ -115,9 +115,16 @@ binary: install
 	dh_md5sums
 	dh_builddeb
 
+EDGE_CONFIG_ARGS = $(KERNEL_SRC) config/proxmox-$(DEB_BUILD_ARCH).config \
+	config/linux-hardened-$(DEB_BUILD_ARCH).config config/edge-$(DEB_BUILD_ARCH).policy
+
 .config_mark:
+	debian/scripts/edge-config merge $(EDGE_CONFIG_ARGS) $(KMAKE_OPTS)
 	cd $(KERNEL_SRC); scripts/config $(PMX_CONFIG_OPTS)
+	debian/scripts/edge-config apply $(EDGE_CONFIG_ARGS)
 	$(MAKE) -C $(KERNEL_SRC) $(KMAKE_OPTS) olddefconfig
+	debian/scripts/edge-config verify $(EDGE_CONFIG_ARGS)
+	rm -f $(KERNEL_SRC)/.config.proxmox $(KERNEL_SRC)/.config.hardened
 	# copy to allow building in parallel to kernel/module compilation without interference
 	rm -rf $(KERNEL_SRC_COPY)
 	cp -ar $(KERNEL_SRC) $(KERNEL_SRC_COPY)
@@ -256,6 +263,19 @@ endif
 
 .headers_install_mark: .compile_mark .modules_compile_mark .headers_compile_mark
 	cp $(KERNEL_SRC)/include/generated/compile.h debian/$(PMX_HEADER_PKG)/usr/src/linux-headers-$(KVNAME)/include/generated/compile.h
+	# the headers were prepared in a separate output directory, which got its own random
+	# struct layout seed; out-of-tree modules must use the one of the built kernel
+	if grep -q '^CONFIG_RANDSTRUCT=y' $(KERNEL_SRC)/.config; then \
+		install -m 0644 $(KERNEL_SRC)/scripts/basic/randstruct.seed debian/$(PMX_HEADER_PKG)/usr/src/linux-headers-$(KVNAME)/scripts/basic/randstruct.seed; \
+		install -m 0644 $(KERNEL_SRC)/include/generated/randstruct_hash.h debian/$(PMX_HEADER_PKG)/usr/src/linux-headers-$(KVNAME)/include/generated/randstruct_hash.h; \
+	fi
+ifeq ($(EDGE_TOOLCHAIN),llvm)
+	# DKMS builds modules for clang-built kernels with LLVM=1, i.e. the unversioned
+	# LLVM tools; make that use the LLVM version the kernel was built with
+	sed -i debian/$(PMX_HEADER_PKG)/usr/src/linux-headers-$(KVNAME)/Makefile \
+	    -e 's/^else ifneq (\$$(LLVM),1)$$/else ifeq ($$(LLVM),1)\nLLVM_SUFFIX := -$(EDGE_LLVM_VERSION)\nelse/'
+	grep -qx 'LLVM_SUFFIX := -$(EDGE_LLVM_VERSION)' debian/$(PMX_HEADER_PKG)/usr/src/linux-headers-$(KVNAME)/Makefile
+endif
 	install -m 0644 $(KERNEL_SRC)/Module.symvers debian/$(PMX_HEADER_PKG)/usr/src/linux-headers-$(KVNAME)
 	mkdir -p debian/$(PMX_HEADER_PKG)/usr/lib/modules/$(KVNAME)
 	ln -sf /usr/src/linux-headers-$(KVNAME) debian/$(PMX_HEADER_PKG)/usr/lib/modules/$(KVNAME)/build

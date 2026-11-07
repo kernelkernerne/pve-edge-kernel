@@ -1,0 +1,23 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Daniel Micay <danielmicay@gmail.com>
+Date: Thu, 4 May 2017 14:45:59 -0400
+Subject: [PATCH] enable SECURITY_PERF_EVENTS_RESTRICT by default
+
+Signed-off-by: Daniel Micay <danielmicay@gmail.com>
+(cherry picked from commit 168073ca48745a5dca8442a01b57bceeb00fc82e)
+---
+ security/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/security/Kconfig b/security/Kconfig
+index 667528552d86e52e825d050f57732bd548676ff6..cf18f3b8b75754cfe5ac060f3d2e65e224d448e5 100644
+--- a/security/Kconfig
++++ b/security/Kconfig
+@@ -73,6 +73,7 @@ config MSEAL_SYSTEM_MAPPINGS
+ config SECURITY_PERF_EVENTS_RESTRICT
+ 	bool "Restrict unprivileged use of performance events"
+ 	depends on PERF_EVENTS
++	default y
+ 	help
+ 	  If you say Y here, the kernel.perf_event_paranoid sysctl
+ 	  will be set to 3 by default, and no unprivileged use of the

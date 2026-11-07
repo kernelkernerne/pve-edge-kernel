@@ -1,0 +1,22 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Daniel Micay <danielmicay@gmail.com>
+Date: Fri, 5 Jan 2018 12:41:42 -0500
+Subject: [PATCH] disable DEVMEM by default
+
+(cherry picked from commit e93cf0682e89176af959d2dd62a53df6187538c9)
+---
+ drivers/char/Kconfig | 1 -
+ 1 file changed, 1 deletion(-)
+
+diff --git a/drivers/char/Kconfig b/drivers/char/Kconfig
+index 73703260aa26493ba35874463af99f4ecc08902c..39cce82db6655ea41c823fcfdda7d9c2d0ac07af 100644
+--- a/drivers/char/Kconfig
++++ b/drivers/char/Kconfig
+@@ -258,7 +258,6 @@ config NSC_GPIO
+ 
+ config DEVMEM
+ 	bool "/dev/mem virtual device support"
+-	default y
+ 	help
+ 	  Say Y here if you want to support the /dev/mem device.
+ 	  The /dev/mem device is used to access areas of physical

@@ -61,8 +61,9 @@ KERNEL_SRC=linux
 KERNEL_TARBALL=linux-$(KERNEL_VER).tar.xz
 KERNEL_TARBALL_URL=https://cdn.kernel.org/pub/linux/kernel/v$(KERNEL_MAJ).x/$(KERNEL_TARBALL)
 KERNEL_TARBALL_SHA256=upstream/$(KERNEL_TARBALL).sha256
-# base config, taken from the Proxmox VE 7.0 kernel; updated with olddefconfig during the build
-KERNEL_CFG_BASE=config/config-base-$(ARCH)
+# kernel configs: the Proxmox VE base, the linux-hardened config and the policy merging both,
+# see config/edge-$(ARCH).policy; merged by debian/scripts/edge-config during the build
+KERNEL_CFG_FILES=config/proxmox-$(ARCH).config config/linux-hardened-$(ARCH).config config/edge-$(ARCH).policy
 
 ZFSONLINUX_SUBMODULE=submodules/zfsonlinux
 ZFSDIR=pkg-zfs
@@ -138,12 +139,12 @@ upstream/$(KERNEL_TARBALL):
 download: upstream/$(KERNEL_TARBALL)
 	cd upstream; sha256sum -c $(KERNEL_TARBALL).sha256
 
-$(KERNEL_SRC).prepared: upstream/$(KERNEL_TARBALL) $(KERNEL_CFG_BASE)
+$(KERNEL_SRC).prepared: upstream/$(KERNEL_TARBALL) $(KERNEL_CFG_FILES)
 	cd upstream; sha256sum -c $(KERNEL_TARBALL).sha256
-	rm -rf $(BUILD_DIR)/$(KERNEL_SRC) $@
-	mkdir -p $(BUILD_DIR)/$(KERNEL_SRC)
+	rm -rf $(BUILD_DIR)/$(KERNEL_SRC) $(BUILD_DIR)/config $@
+	mkdir -p $(BUILD_DIR)/$(KERNEL_SRC) $(BUILD_DIR)/config
 	tar -C $(BUILD_DIR)/$(KERNEL_SRC) --strip-components=1 -xf upstream/$(KERNEL_TARBALL)
-	cp $(KERNEL_CFG_BASE) $(BUILD_DIR)/$(KERNEL_SRC)/.config
+	cp $(KERNEL_CFG_FILES) $(BUILD_DIR)/config/
 	sed -i $(BUILD_DIR)/$(KERNEL_SRC)/Makefile -e 's/^EXTRAVERSION.*$$/EXTRAVERSION=$(EXTRAVERSION)/'
 	set -e; cd $(BUILD_DIR)/$(KERNEL_SRC); \
 	  for patch in ../../patches/kernel/*.patch; do \

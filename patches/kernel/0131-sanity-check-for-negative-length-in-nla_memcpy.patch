@@ -1,0 +1,26 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Daniel Micay <danielmicay@gmail.com>
+Date: Mon, 15 May 2017 23:51:12 -0400
+Subject: [PATCH] sanity check for negative length in nla_memcpy
+
+Extracted from PaX.
+
+Signed-off-by: Daniel Micay <danielmicay@gmail.com>
+(cherry picked from commit b040b4d6cc8b7fac31501e540a8bae4dc5a3c164)
+---
+ lib/nlattr.c | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/lib/nlattr.c b/lib/nlattr.c
+index be9c576b6e2dc6d35d67d31f15014ab747f478ce..484d839bcf5e0b3c0cb4c656b0e7b3179e301775 100644
+--- a/lib/nlattr.c
++++ b/lib/nlattr.c
+@@ -837,6 +837,8 @@ int nla_memcpy(void *dest, const struct nlattr *src, int count)
+ {
+ 	int minlen = min_t(int, count, nla_len(src));
+ 
++	BUG_ON(minlen < 0);
++
+ 	memcpy(dest, nla_data(src), minlen);
+ 	if (count > minlen)
+ 		memset(dest + minlen, 0, count - minlen);

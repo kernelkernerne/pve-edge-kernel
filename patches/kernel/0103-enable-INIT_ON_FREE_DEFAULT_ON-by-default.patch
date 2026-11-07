@@ -1,0 +1,22 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Levente Polyak <levente@leventepolyak.net>
+Date: Thu, 19 Sep 2019 19:03:01 +0200
+Subject: [PATCH] enable INIT_ON_FREE_DEFAULT_ON by default
+
+(cherry picked from commit 33db6686bb965f8c6ce202a0dc5e94cd67678476)
+---
+ security/Kconfig.hardening | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/security/Kconfig.hardening b/security/Kconfig.hardening
+index 269977db563760e944073a362f3058faafc72aa5..06459c66ea3d21c5f957114c9164db9804e0f94b 100644
+--- a/security/Kconfig.hardening
++++ b/security/Kconfig.hardening
+@@ -172,6 +172,7 @@ config INIT_ON_ALLOC_DEFAULT_ON
+ 
+ config INIT_ON_FREE_DEFAULT_ON
+ 	bool "Enable heap memory zeroing on free by default"
++	default y
+ 	depends on !KMSAN
+ 	help
+ 	  This has the effect of setting "init_on_free=1" on the kernel

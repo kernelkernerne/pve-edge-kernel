@@ -1,0 +1,143 @@
+#!/usr/bin/env python3
+"""Merge the Proxmox VE and linux-hardened kernel configs according to a policy file.
+
+  edge-config merge  SRCDIR PROXMOX_CONFIG HARDENED_CONFIG POLICY [MAKE_ARG...]
+  edge-config apply  SRCDIR PROXMOX_CONFIG HARDENED_CONFIG POLICY
+  edge-config verify SRCDIR PROXMOX_CONFIG HARDENED_CONFIG POLICY
+
+'merge' updates both configs to the kernel tree in SRCDIR with olddefconfig, then
+writes SRCDIR/.config: the Proxmox config with the policy applied. The normalized
+linux-hardened config is kept as SRCDIR/.config.hardened for 'apply' and 'verify'.
+
+'apply' applies the policy to SRCDIR/.config again, e.g. after other options were set.
+
+'verify' checks that every symbol in the policy has the requested value in
+SRCDIR/.config and fails otherwise.
+"""
+
+import os
+import re
+import shutil
+import subprocess
+import sys
+
+SYM_RE = re.compile(r'^CONFIG_(\w+)=(.*)$')
+UNSET_RE = re.compile(r'^# CONFIG_(\w+) is not set$')
+
+
+def load_config(path):
+    values = {}
+    with open(path) as f:
+        for line in f:
+            line = line.rstrip('\n')
+            m = SYM_RE.match(line)
+            if m:
+                values[m.group(1)] = m.group(2)
+                continue
+            m = UNSET_RE.match(line)
+            if m:
+                values[m.group(1)] = 'n'
+    return values
+
+
+def known_symbols(srcdir):
+    symbols = set()
+    decl = re.compile(r'^\s*(?:menu)?config\s+(\w+)\s*$')
+    for root, dirs, files in os.walk(srcdir):
+        dirs[:] = [d for d in dirs if not d.startswith('.')]
+        for name in files:
+            if not name.startswith('Kconfig'):
+                continue
+            with open(os.path.join(root, name), errors='replace') as f:
+                for line in f:
+                    m = decl.match(line)
+                    if m:
+                        symbols.add(m.group(1))
+    return symbols
+
+
+def load_policy(path, hardened):
+    wanted = {}
+    with open(path) as f:
+        for lineno, line in enumerate(f, 1):
+            line = line.strip()
+            if not line or line.startswith('#'):
+                continue
+            where = f'{path}:{lineno}'
+            if line.startswith('hardened '):
+                sym = line.split(None, 1)[1]
+                wanted[sym] = (hardened.get(sym, 'n'), where)
+            elif line.startswith('set '):
+                sym, _, value = line.split(None, 1)[1].partition('=')
+                if not value:
+                    sys.exit(f'{where}: expected "set SYMBOL=VALUE"')
+                wanted[sym] = (value, where)
+            else:
+                sys.exit(f'{where}: unknown directive: {line}')
+    return wanted
+
+
+def config_args(sym, value):
+    if value == 'y':
+        return ['--enable', sym]
+    if value == 'm':
+        return ['--module', sym]
+    if value == 'n':
+        return ['--disable', sym]
+    if value.startswith('"') and value.endswith('"'):
+        return ['--set-str', sym, value[1:-1]]
+    return ['--set-val', sym, value]
+
+
+def olddefconfig(srcdir, make_args, src, dst):
+    shutil.copyfile(src, os.path.join(srcdir, '.config'))
+    subprocess.run(['make', '-s', '-C', srcdir, *make_args, 'olddefconfig'], check=True,
+                   stdout=subprocess.DEVNULL)
+    shutil.copyfile(os.path.join(srcdir, '.config'), dst)
+
+
+def apply_policy(srcdir, wanted):
+    args = []
+    for sym, (value, _) in wanted.items():
+        args += config_args(sym, value)
+    subprocess.run([os.path.join(srcdir, 'scripts', 'config'),
+                    '--file', os.path.join(srcdir, '.config'), *args], check=True)
+
+
+def main():
+    if len(sys.argv) < 6 or sys.argv[1] not in ('merge', 'apply', 'verify'):
+        sys.exit(__doc__)
+    mode, srcdir, proxmox, hardened, policy = sys.argv[1:6]
+    make_args = sys.argv[6:]
+    hardened_norm = os.path.join(srcdir, '.config.hardened')
+
+    if mode == 'merge':
+        proxmox_norm = os.path.join(srcdir, '.config.proxmox')
+        olddefconfig(srcdir, make_args, hardened, hardened_norm)
+        olddefconfig(srcdir, make_args, proxmox, proxmox_norm)
+        wanted = load_policy(policy, load_config(hardened_norm))
+
+        unknown = sorted(s for s in wanted if s not in known_symbols(srcdir))
+        if unknown:
+            sys.exit('policy references unknown symbols: ' + ', '.join(unknown))
+
+        shutil.copyfile(proxmox_norm, os.path.join(srcdir, '.config'))
+        apply_policy(srcdir, wanted)
+        print(f'edge-config: applied {len(wanted)} policy settings')
+        return
+
+    wanted = load_policy(policy, load_config(hardened_norm))
+    if mode == 'apply':
+        apply_policy(srcdir, wanted)
+        return
+
+    final = load_config(os.path.join(srcdir, '.config'))
+    bad = [f'  {where}: CONFIG_{sym} is {final.get(sym, "n")}, want {value}'
+           for sym, (value, where) in wanted.items() if final.get(sym, 'n') != value]
+    if bad:
+        sys.exit('edge-config: policy not met:\n' + '\n'.join(bad))
+    print(f'edge-config: all {len(wanted)} policy settings verified')
+
+
+if __name__ == '__main__':
+    main()

@@ -2,6 +2,28 @@ proxmox-kernel-edge-7.3 (7.3.3-1) trixie; urgency=medium
 
   * update to Linux 7.3.3 from kernel.org.
 
+  * harden the kernel:
+    - apply linux-hardened v7.3.1-hardened1 (all 101 patches, from the signed
+      release by Levente Polyak, E240B57E2C4630BA768E2F26FC1B547C8D8172C8).
+    - merge the Proxmox VE config with the Arch Linux linux-hardened config,
+      keeping the Proxmox values for hardware, drivers and scheduling and
+      taking the stronger value for security relevant options, as defined in
+      config/edge-amd64.policy; the build verifies that the policy is met.
+    - enforce kCFI control flow integrity (FineIBT with IBT), randomize struct
+      layouts, check page tables, erase the kernel stack on syscall return,
+      zero memory on allocation and free, add slab canaries and restrict the
+      kernel to strict IOMMU invalidation.
+    - drop kexec, crash dumps, hibernation, livepatch, /dev/mem, /dev/port,
+      /proc/kcore, legacy vsyscalls, the LDT and 16-bit segments, exotic
+      partition tables, file systems and protocols such as SCTP and X.25, SMB1,
+      and debugging and fault injection interfaces.
+    - keep unprivileged user namespaces and overlayfs mounts for nested
+      containers, 32-bit binaries and loading unsigned DKMS modules, and do not
+      panic on an oops.
+
+  * ship the struct layout seed of the built kernel in the headers package and
+    make LLVM=1, as used by DKMS, build with LLVM 23.
+
   * build with Clang/LLVM 23 and ThinLTO by default; the toolchain, LLVM
     version and LTO mode are selectable with EDGE_TOOLCHAIN, EDGE_LLVM_VERSION
     and EDGE_LTO. Rust support is disabled for LTO builds, as LTO together
@@ -30,7 +52,7 @@ proxmox-kernel-edge-7.3 (7.3.3-1) trixie; urgency=medium
     - do not take the KVM nSVM EFER.LMA, skb_zerocopy shared-frag and
       create_io_thread() fixes, which are part of 7.3.3 already.
 
- -- pve-edge-kernel <pve-edge-kernel@users.noreply.github.com>  Sat, 07 Nov 2026 12:30:00 +0530
+ -- pve-edge-kernel <pve-edge-kernel@users.noreply.github.com>  Sat, 07 Nov 2026 13:30:00 +0530
 
 proxmox-kernel-edge-7.2 (7.2.11-1) trixie; urgency=medium
 

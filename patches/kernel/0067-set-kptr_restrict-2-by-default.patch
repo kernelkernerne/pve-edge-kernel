@@ -1,0 +1,24 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Daniel Micay <danielmicay@gmail.com>
+Date: Wed, 3 May 2017 12:06:14 -0400
+Subject: [PATCH] set kptr_restrict=2 by default
+
+Signed-off-by: Daniel Micay <danielmicay@gmail.com>
+(cherry picked from commit 31fa8e9017596e640f2ecca9bff894228bd827c1)
+---
+ lib/vsprintf.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/lib/vsprintf.c b/lib/vsprintf.c
+index 1d95ab9314bf7d16623129d51930a0e17cd60bd6..a1cfb4f701826991b806809bf161d5493ba34994 100644
+--- a/lib/vsprintf.c
++++ b/lib/vsprintf.c
+@@ -849,7 +849,7 @@ static char *default_pointer(char *buf, char *end, const void *ptr,
+ 	return ptr_to_id(buf, end, ptr, spec);
+ }
+ 
+-int kptr_restrict __read_mostly;
++int kptr_restrict __read_mostly = 2;
+ EXPORT_SYMBOL_FOR_MODULES(kptr_restrict, "printf_kunit");
+ 
+ static noinline_for_stack

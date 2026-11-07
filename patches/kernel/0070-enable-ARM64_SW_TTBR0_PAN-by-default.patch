@@ -1,0 +1,22 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Daniel Micay <danielmicay@gmail.com>
+Date: Sun, 25 Feb 2018 01:39:32 -0500
+Subject: [PATCH] enable ARM64_SW_TTBR0_PAN by default
+
+(cherry picked from commit 11ee62394636d070151703d804bb9b47e2ae8def)
+---
+ arch/arm64/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index cab741a695f5231de63b1f5b03cf5e9403cd9168..c9c9957069805546100d4a64e7ae623f1e5397c7 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -1821,6 +1821,7 @@ config MITIGATE_SPECTRE_BRANCH_HISTORY
+ config ARM64_SW_TTBR0_PAN
+ 	bool "Emulate Privileged Access Never using TTBR0_EL1 switching"
+ 	depends on !KCSAN
++	default y
+ 	help
+ 	  Enabling this option prevents the kernel from accessing
+ 	  user-space memory directly by pointing TTBR0_EL1 to a reserved

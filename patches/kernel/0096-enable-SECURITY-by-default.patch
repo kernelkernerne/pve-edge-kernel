@@ -1,0 +1,22 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Daniel Micay <danielmicay@gmail.com>
+Date: Sun, 25 Feb 2018 02:13:48 -0500
+Subject: [PATCH] enable SECURITY by default
+
+(cherry picked from commit 8b9077d5cc35658f86735202948b75522a0641e6)
+---
+ security/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/security/Kconfig b/security/Kconfig
+index 3d5c65d2ca72b62298600e511fc07ee2a1f60b52..ee1519d2bac1831b9a683a1223527a64ffbb06d3 100644
+--- a/security/Kconfig
++++ b/security/Kconfig
+@@ -74,6 +74,7 @@ config SECURITY
+ 	bool "Enable different security models"
+ 	depends on SYSFS
+ 	depends on MULTIUSER
++	default y
+ 	help
+ 	  This allows you to choose different security modules to be
+ 	  configured into your kernel.
