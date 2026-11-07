@@ -1,0 +1,16 @@
+# pve-edge-kernel: this kernel was built with LLVM=-@LLVM_VERSION@. External modules must be built with
+# the same toolchain, also if their build system passes CC or LD on the command line, like the
+# NVIDIA driver, or DKMS sets CC to the unversioned clang.
+ifneq ($(M)$(KBUILD_EXTMOD),)
+MAKEOVERRIDES := $(filter-out CC=% LD=% AR=% NM=% OBJCOPY=% OBJDUMP=% READELF=% STRIP=% LLVM=%,$(MAKEOVERRIDES)) LLVM=-@LLVM_VERSION@
+override LLVM := -@LLVM_VERSION@
+override CC := clang-@LLVM_VERSION@
+override LD := ld.lld-@LLVM_VERSION@
+override AR := llvm-ar-@LLVM_VERSION@
+override NM := llvm-nm-@LLVM_VERSION@
+override OBJCOPY := llvm-objcopy-@LLVM_VERSION@
+override OBJDUMP := llvm-objdump-@LLVM_VERSION@
+override READELF := llvm-readelf-@LLVM_VERSION@
+override STRIP := llvm-strip-@LLVM_VERSION@
+endif
+

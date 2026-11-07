@@ -24,7 +24,9 @@ proxmox-kernel-edge-7.3 (7.3.3-1) trixie; urgency=medium
   * allow skipping lintian with EDGE_LINTIAN=0.
 
   * ship the struct layout seed of the built kernel in the headers package and
-    make LLVM=1, as used by DKMS, build with LLVM 23.
+    force the LLVM 23 toolchain for out-of-tree modules, also if their build
+    system passes its own CC or LD, like the NVIDIA driver, or DKMS selects the
+    unversioned clang.
 
   * kCFI: fix building GPL-incompatible modules, such as ZFS and NVIDIA, which
     failed modpost on the GPL-only __clear_pages_unrolled(), referenced by
