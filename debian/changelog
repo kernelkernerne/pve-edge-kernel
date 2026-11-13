@@ -1,3 +1,26 @@
+proxmox-kernel-edge-7.3 (7.3.4-1) trixie; urgency=medium
+
+  * update to Linux 7.3.4.
+
+  * drop patches included in Linux 7.3.4:
+    0016-aio-prevent-eventfd-epoll-recursion-on-poll.patch,
+    0017-Revert-net-advertise-TCP-MSS-from-the-configured-MTU.patch,
+    0018-net-limit-priority-VLAN-untag-depth.patch,
+    0019-netfilter-nf_reject-initialize-IPCB-at-inet-ingress.patch,
+    0020-net-packet-check-TX_RING-fragments-before-memory-acc.patch,
+    0021-mm-swap-fix-swap_cache_get_folio-returning-a-folio-t.patch,
+    0023-crypto-algif_skcipher-rewind-rounded-output-bytes.patch,
+    0026-ucount-take-the-rlimit-reference-before-checking-the.patch,
+    0031-iov_iter-fix-NULL-deref-in-iov_iter_alignment.patch,
+    0032-aio-fix-NULL-deref-when-a-fault-races-ring-truncatio.patch,
+    0044-inet-reject-unhashed-sockets-during-established-look.patch,
+    0047-inet-frags-prevent-acceptance-of-partially-authentic.patch,
+    0065-x86-mm-pat-Use-pr_warn-for-early-W-X-warnings.patch.
+
+  * update the Arch Linux linux-hardened config to 7.2.15.hardened1-3.
+
+ -- pve-edge-kernel <pve-edge-kernel@users.noreply.github.com>  Fri, 13 Nov 2026 14:36:37 +0000
+
 proxmox-kernel-edge-7.3 (7.3.3-2) trixie; urgency=medium
 
   * kCFI: only poison real kCFI and FineIBT function preambles when sealing.
