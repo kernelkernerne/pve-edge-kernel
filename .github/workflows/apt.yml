@@ -1,0 +1,33 @@
+name: apt
+
+# Add the packages of a release to the APT repository, see ci/apt-publish.sh. Run by the build
+# workflow after publishing a release.
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release to publish, e.g. v7.3.3-2
+        required: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: apt
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install tools
+        run: sudo apt-get install -y -qq apt-utils dpkg-dev xz-utils > /dev/null
+
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+          APT_SIGNING_KEY: ${{ secrets.APT_SIGNING_KEY }}
+        run: ci/apt-publish.sh "${{ inputs.tag }}"

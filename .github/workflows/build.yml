@@ -8,6 +8,7 @@ on:
 
 permissions:
   contents: write
+  actions: write
 
 concurrency:
   group: build-${{ github.ref }}
@@ -81,3 +82,5 @@ jobs:
           awk 'NR > 2 && /^ -- / { exit } NR > 2' debian/changelog > notes.md
           gh release create "$GITHUB_REF_NAME" out/* --verify-tag \
               --title "$GITHUB_REF_NAME" --notes-file notes.md
+          gh workflow run apt.yml --ref "${{ github.event.repository.default_branch }}" \
+              -f tag="$GITHUB_REF_NAME"

@@ -32,6 +32,26 @@ The config policy lists every option taken from linux-hardened or set explicitly
 fails if the resulting config does not match it. `README.proxmox` is the README of the Proxmox
 VE kernel this is forked from.
 
+## Installing from the APT repository
+
+Released packages are published as an APT repository in the
+[`apt` release](https://github.com/kernelkernerne/pve-edge-kernel/releases/tag/apt), signed with
+`keys/apt.asc` (`021E C800 04BF 191B 38EC  C151 CDF8 D794 BD00 530D`). It keeps the newest three
+versions. They are built with `EDGE_MARCH=icelake-server` and only boot on Ice Lake server or
+newer Intel CPUs; build the packages yourself for other CPUs.
+
+```
+curl -fsSL https://github.com/kernelkernerne/pve-edge-kernel/releases/download/apt/pve-edge-kernel.gpg \
+    -o /usr/share/keyrings/pve-edge-kernel.gpg
+echo "deb [signed-by=/usr/share/keyrings/pve-edge-kernel.gpg] https://github.com/kernelkernerne/pve-edge-kernel/releases/download/apt ./" \
+    > /etc/apt/sources.list.d/pve-edge-kernel.list
+apt update
+apt install proxmox-kernel-edge-7.3 proxmox-headers-edge-7.3
+```
+
+Pin the old kernel with `proxmox-boot-tool kernel pin` until the new one has booted fine. The
+repository does not contain `proxmox-kernel-libc-dev`, so the one of Proxmox VE stays installed.
+
 ## Building
 
 On Debian trixie with the build dependencies installed (see `ci/deps.sh`), or in a container
@@ -63,7 +83,8 @@ BUILD_EXCLUSIVE_KERNEL="^[0-9.]+-[0-9]+-pve$"
 | workflow | when | what |
 |---|---|---|
 | `check` | push, pull request | signatures and checksums, patch queue (`ci/patchq.py`), package version, config policy |
-| `build` | manually, tags `v*` | full build; tags matching the package version publish a release |
+| `build` | manually, tags `v*` | full build; tags matching the package version publish a release and add it to the APT repository |
+| `apt` | after a release, manually | adds the packages of a release to the APT repository (`ci/apt-publish.sh`) |
 | `watch` | daily | upstream updates, see below |
 
 `ci/watch.py` puts updates that can be applied mechanically into one pull request: a newer
