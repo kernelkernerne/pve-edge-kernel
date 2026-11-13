@@ -21,12 +21,17 @@ does not help in most of the reported cases. Restore the quirk as
 shipped up to 7.0.14-6, which affected users confirm working.
 
 Signed-off-by: Thomas Lamprecht <t.lamprecht@proxmox.com>
+[ pve-edge-kernel: rebased onto 7.3.4, which picked up the upstream fix
+  mentioned above as ff8a969f7dc8 ("PCI: Skip Target Speed quirk on
+  clamped ports with no link"); revert it as well, so the quirk again
+  matches the one shipped up to 7.0.14-6. ]
+Signed-off-by: pve-edge-kernel <pve-edge-kernel@users.noreply.github.com>
 ---
- drivers/pci/quirks.c | 55 +++++++++++++++++++++++++++-----------------
- 1 file changed, 34 insertions(+), 21 deletions(-)
+ drivers/pci/quirks.c |   61 +++++++++++++++++++++++++++++---------------------
+ 1 file changed, 35 insertions(+), 26 deletions(-)
 
 diff --git a/drivers/pci/quirks.c b/drivers/pci/quirks.c
-index db12e37ae44714b74150a1e4dabfc7d02d42f692..1fd78ca0a6fb079310c68a30bad4ba56f49a6058 100644
+index d4fcc33..80aa60c 100644
 --- a/drivers/pci/quirks.c
 +++ b/drivers/pci/quirks.c
 @@ -80,10 +80,11 @@ static bool pcie_lbms_seen(struct pci_dev *dev, u16 lnksta)
@@ -45,7 +50,7 @@ index db12e37ae44714b74150a1e4dabfc7d02d42f692..1fd78ca0a6fb079310c68a30bad4ba56
   *
   * Otherwise revert the speed to the original setting and request a retrain
   * again to remove any residual state, ignoring the result as it's supposed
-@@ -94,39 +95,51 @@ static bool pcie_lbms_seen(struct pci_dev *dev, u16 lnksta)
+@@ -94,43 +95,51 @@ static bool pcie_lbms_seen(struct pci_dev *dev, u16 lnksta)
   */
  int pcie_failed_link_retrain(struct pci_dev *dev)
  {
@@ -68,7 +73,12 @@ index db12e37ae44714b74150a1e4dabfc7d02d42f692..1fd78ca0a6fb079310c68a30bad4ba56
 -
  	pcie_capability_read_word(dev, PCI_EXP_LNKSTA, &lnksta);
 -	pcie_capability_read_word(dev, PCI_EXP_LNKCTL2, &oldlnkctl2);
- 	if (!(lnksta & PCI_EXP_LNKSTA_DLLLA) && pcie_lbms_seen(dev, lnksta)) {
+-	if (lnksta & PCI_EXP_LNKSTA_DLLLA) {
+-		;
+-	} else if (PCIE_LNKCTL2_TLS2SPEED(oldlnkctl2) == PCIE_SPEED_2_5GT) {
+-		return ret;
+-	} else if (pcie_lbms_seen(dev, lnksta)) {
++	if (!(lnksta & PCI_EXP_LNKSTA_DLLLA) && pcie_lbms_seen(dev, lnksta)) {
 +		u16 oldlnkctl2;
 +
  		pci_info(dev, "broken device, retraining non-functional downstream link at 2.5GT/s\n");
