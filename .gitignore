@@ -8,3 +8,4 @@
 /proxmox-kernel-[0-9]*/
 /upstream/*.tar.xz
 /upstream/*.tmp
+/check-report.md

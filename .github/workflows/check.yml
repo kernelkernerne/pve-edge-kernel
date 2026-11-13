@@ -1,0 +1,32 @@
+name: check
+
+# Signatures and checksums of the upstream sources, the patch queue, the package version and
+# the kernel config policy; see ci/check.sh. A full build is done by the build workflow.
+on:
+  push:
+    branches: ['edge-*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Check
+        run: ci/container.sh ci/check.sh
+
+      - name: Report
+        if: always()
+        run: test -f check-report.md && cat check-report.md >> "$GITHUB_STEP_SUMMARY" || true
