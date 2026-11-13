@@ -65,6 +65,10 @@ KERNEL_TARBALL_SHA256=upstream/$(KERNEL_TARBALL).sha256
 # see config/edge-$(ARCH).policy; merged by debian/scripts/edge-config during the build
 KERNEL_CFG_FILES=config/proxmox-$(ARCH).config config/linux-hardened-$(ARCH).config config/edge-$(ARCH).policy
 
+# linux-hardened release patch, kept unmodified with its upstream signature and applied after
+# patches/kernel; its signature is checked against keys/linux-hardened.gpg
+HARDENED_PATCHES=$(sort $(wildcard patches/hardened/*.patch))
+
 ZFSONLINUX_SUBMODULE=submodules/zfsonlinux
 ZFSDIR=pkg-zfs
 
@@ -143,18 +147,34 @@ upstream/$(KERNEL_TARBALL):
 download: upstream/$(KERNEL_TARBALL)
 	cd upstream; sha256sum -c $(KERNEL_TARBALL).sha256
 
-$(KERNEL_SRC).prepared: upstream/$(KERNEL_TARBALL) $(KERNEL_CFG_FILES)
+.PHONY: verify-hardened
+verify-hardened:
+	set -e; for patch in $(HARDENED_PATCHES); do \
+	    gpgv --keyring ./keys/linux-hardened.gpg "$$patch.sig" "$$patch"; \
+	  done
+
+# print a variable, e.g. 'make -s print-KERNEL_VER', for scripts and CI
+print-%:
+	@echo '$($*)'
+
+$(KERNEL_SRC).prepared: upstream/$(KERNEL_TARBALL) $(KERNEL_CFG_FILES) $(HARDENED_PATCHES) | verify-hardened
 	cd upstream; sha256sum -c $(KERNEL_TARBALL).sha256
 	rm -rf $(BUILD_DIR)/$(KERNEL_SRC) $(BUILD_DIR)/config $@
 	mkdir -p $(BUILD_DIR)/$(KERNEL_SRC) $(BUILD_DIR)/config
 	tar -C $(BUILD_DIR)/$(KERNEL_SRC) --strip-components=1 -xf upstream/$(KERNEL_TARBALL)
 	cp $(KERNEL_CFG_FILES) $(BUILD_DIR)/config/
-	sed -i $(BUILD_DIR)/$(KERNEL_SRC)/Makefile -e 's/^EXTRAVERSION.*$$/EXTRAVERSION=$(EXTRAVERSION)/'
 	set -e; cd $(BUILD_DIR)/$(KERNEL_SRC); \
 	  for patch in ../../patches/kernel/*.patch; do \
 	    echo "applying patch '$$patch'"; \
-	    patch --batch --forward -p1 < "$${patch}"; \
+	    patch --batch --forward --no-backup-if-mismatch -p1 < "$${patch}"; \
 	  done
+	# the release patch also sets EXTRAVERSION, in a hunk that only applies to its exact base
+	set -e; cd $(BUILD_DIR)/$(KERNEL_SRC); \
+	  for patch in $(addprefix $(CURDIR)/,$(HARDENED_PATCHES)); do \
+	    echo "applying patch '$$patch'"; \
+	    filterdiff -p1 -x Makefile "$${patch}" | patch --batch --forward --no-backup-if-mismatch -p1; \
+	  done
+	sed -i $(BUILD_DIR)/$(KERNEL_SRC)/Makefile -e 's/^EXTRAVERSION.*$$/EXTRAVERSION=$(EXTRAVERSION)/'
 	touch $@
 
 $(MODULES).prepared: $(addsuffix .prepared,$(MODULE_DIRS))
@@ -170,7 +190,7 @@ $(ZFSDIR).prepared: $(ZFSONLINUX_SUBMODULE) $(wildcard patches/zfs/*.patch) | su
 	set -e; cd $(BUILD_DIR)/$(MODULES)/$(ZFSDIR); \
 	  for patch in $(addprefix $(CURDIR)/,$(sort $(wildcard patches/zfs/*.patch))); do \
 	    echo "applying patch '$$patch'"; \
-	    patch --batch --forward -p1 < "$${patch}"; \
+	    patch --batch --forward --no-backup-if-mismatch -p1 < "$${patch}"; \
 	  done
 	touch $(ZFSDIR).prepared
 
