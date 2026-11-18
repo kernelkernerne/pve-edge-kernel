@@ -4,7 +4,7 @@
 #   proxmox-amd64.config         - Proxmox VE kernel config (base)
 #   linux-hardened-amd64.config  - Arch Linux linux-hardened config, from
 #     https://gitlab.archlinux.org/archlinux/packaging/packages/linux-hardened
-#     (config.x86_64 at 7de287fcb4742110581af1f1e81cf875da53dcd4, 7.2.10.hardened1-4)
+#     (config.x86_64 at d0fbc6ec5b4f4bf40b96010fb4b29bca805c49e2, 7.2.15.hardened1-3)
 #
 # Every symbol keeps its Proxmox value, except:
 #   hardened SYMBOL   - take the value from the linux-hardened config
