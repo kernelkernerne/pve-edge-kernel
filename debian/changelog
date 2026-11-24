@@ -1,3 +1,46 @@
+proxmox-kernel-edge-7.3 (7.3.6-1) trixie; urgency=medium
+
+  * update to Linux 7.3.6.
+
+  * drop patches included in Linux 7.3.6:
+    0016-aio-prevent-eventfd-epoll-recursion-on-poll.patch,
+    0017-Revert-net-advertise-TCP-MSS-from-the-configured-MTU.patch,
+    0018-net-limit-priority-VLAN-untag-depth.patch,
+    0019-netfilter-nf_reject-initialize-IPCB-at-inet-ingress.patch,
+    0020-net-packet-check-TX_RING-fragments-before-memory-acc.patch,
+    0021-mm-swap-fix-swap_cache_get_folio-returning-a-folio-t.patch,
+    0022-block-restore-the-iterator-when-rejecting-a-misalign.patch,
+    0023-crypto-algif_skcipher-rewind-rounded-output-bytes.patch,
+    0025-xfrm-interface-validate-the-IP-header-on-xmit.patch,
+    0026-ucount-take-the-rlimit-reference-before-checking-the.patch,
+    0027-mm-khugepaged-flush-deferred-unmaps-before-dropping-.patch,
+    0028-ipv6-raw-fix-use-after-free-in-rawv6_send_hdrinc.patch,
+    0029-xfrm4-use-a-full-socket-for-local-errors.patch,
+    0030-xattr-always-invoke-cap_convert_nscap-for-security.c.patch,
+    0031-iov_iter-fix-NULL-deref-in-iov_iter_alignment.patch,
+    0032-aio-fix-NULL-deref-when-a-fault-races-ring-truncatio.patch,
+    0037-mm-mglru-don-t-use-stack-pointers-when-walking-PUD-a.patch,
+    0038-mm-filemap-finish-fault-cleanup-before-dropping-the-.patch,
+    0039-mm-fix-unkillable-fault-loop-on-MAP_DROPPABLE-memory.patch,
+    0040-mm-huge_memory-fix-truncate-racing-with-PMD-zapping.patch,
+    0041-mm-madvise-fix-data-loss-from-MADV_FREE-on-a-KSM-pag.patch,
+    0042-mm-mempolicy-charge-shared-policy-nodes.patch,
+    0043-sctp-account-for-chunk-padding-in-sctp_init_cause.patch,
+    0044-inet-reject-unhashed-sockets-during-established-look.patch,
+    0048-inet-frags-limit-the-truesize-of-a-reassembly-queue.patch,
+    0049-net-sched-sch_qfq-prevent-aggregate-self-replacement.patch,
+    0054-mptcp-do-not-use-Fast-Open-on-MP_JOIN-subflows.patch,
+    0055-mptcp-pm-kernel-use-RCU-to-free-endpoint-listeners.patch,
+    0057-can-isotp-check-the-frame-type-not-just-the-length.patch,
+    0061-KVM-x86-mmu-Cap-number-of-parent-PTEs-per-SP-at-1000.patch,
+    0065-x86-mm-pat-Use-pr_warn-for-early-W-X-warnings.patch.
+
+  * update linux-hardened to v7.3.6-hardened1.
+
+  * update the Arch Linux linux-hardened config to 7.3.6.hardened1-1.
+
+ -- pve-edge-kernel <pve-edge-kernel@users.noreply.github.com>  Tue, 24 Nov 2026 14:00:37 +0000
+
 proxmox-kernel-edge-7.3 (7.3.3-2) trixie; urgency=medium
 
   * kCFI: only poison real kCFI and FineIBT function preambles when sealing.
